@@ -56,6 +56,8 @@ public sealed class ConditionalMemberRegisterTests
         "HmiPage.SnapshotId",
         // hmi_read, host to caller only: present when more rows exist.
         "HmiPage.NextCursor",
+        // read_cross_references: present only on a provisional HMI tag selector; path selectors omit it.
+        "CrossReferenceSelectorInfo.Hmi",
     };
 
     [Fact]

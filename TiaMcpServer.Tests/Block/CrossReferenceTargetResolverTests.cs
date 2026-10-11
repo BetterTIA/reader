@@ -1,5 +1,6 @@
 using Siemens.Engineering;
 using Siemens.Engineering.CrossReference;
+using Siemens.Engineering.HmiUnified.HmiTags;
 using Siemens.Engineering.HW;
 using Siemens.Engineering.HW.Features;
 using Siemens.Engineering.SW;
@@ -13,6 +14,7 @@ using TiaMcpServer.Contracts.Worker;
 using TiaMcpServer.OpennessWorker.Openness.CrossReferences;
 using TiaMcpServer.OpennessWorker.Openness.Project;
 using TiaMcpServer.OpennessWorker.Worker;
+using TiaMcpServer.Tests.Hmi;
 using Xunit;
 
 namespace TiaMcpServer.Tests.Block;
@@ -170,6 +172,63 @@ public class CrossReferenceTargetResolverTests
 
         Assert.Equal(WorkerFailureCategories.TargetKindUnsupported, error.FailureCategory);
     }
+
+    [Fact]
+    public void HmiSelector_ResolvesTagService()
+    {
+        var hmi = HmiTestProjects.Unified("HMI_RT_1");
+        hmi.Tags.Items.Add(Leaf(new HmiTag(), "Other"));
+        hmi.Tags.Items.Add(Leaf(new HmiTag(), "Motor.Speed")); // a real tag whose name contains '.'
+        var project = HmiTestProjects.ProjectWith(HmiTestProjects.DeviceWith("Panel_1", hmi));
+        var selector = Hmi("panel_1", "motor.speed");
+
+        var resolved = CrossReferenceTargetResolver.Resolve(project, selector);
+
+        Assert.Same(services["Motor.Speed"], resolved.LeafService);
+        Assert.Null(resolved.Container);
+        Assert.Same(selector, resolved.Canonical);
+    }
+
+    [Fact]
+    public void HmiSelector_NullService_IsTargetKindUnsupported()
+    {
+        var hmi = HmiTestProjects.Unified("HMI_RT_1");
+        hmi.Tags.Items.Add(new HmiTag { Name = "NoService" });
+        var project = HmiTestProjects.ProjectWith(HmiTestProjects.DeviceWith("Panel_1", hmi));
+
+        var error = Assert.Throws<WorkerOperationException>(
+            () => CrossReferenceTargetResolver.Resolve(project, Hmi("HMI_RT_1", "NoService")));
+
+        Assert.Equal(WorkerFailureCategories.TargetKindUnsupported, error.FailureCategory);
+    }
+
+    [Fact]
+    public void HmiSelector_Classic_IsTargetKindUnsupported()
+    {
+        var project = HmiTestProjects.ProjectWith(HmiTestProjects.DeviceWith("Panel_1", HmiTestProjects.Classic("Classic_RT")));
+
+        var error = Assert.Throws<WorkerOperationException>(
+            () => CrossReferenceTargetResolver.Resolve(project, Hmi("Classic_RT", "Tag1")));
+
+        Assert.Equal(WorkerFailureCategories.TargetKindUnsupported, error.FailureCategory);
+    }
+
+    [Fact]
+    public void HmiSelector_MemberPath_IsTargetNotFoundWithGuidance()
+    {
+        var hmi = HmiTestProjects.Unified("HMI_RT_1");
+        hmi.Tags.Items.Add(Leaf(new HmiTag(), "Motor"));
+        var project = HmiTestProjects.ProjectWith(HmiTestProjects.DeviceWith("Panel_1", hmi));
+
+        var error = Assert.Throws<WorkerOperationException>(
+            () => CrossReferenceTargetResolver.Resolve(project, Hmi("HMI_RT_1", "Motor.Speed")));
+
+        Assert.Equal(WorkerFailureCategories.TargetNotFound, error.FailureCategory);
+        Assert.Contains("UDT member paths are not supported", error.Message);
+    }
+
+    private static CrossReferenceSelectorInfo Hmi(string hmiName, string tagName)
+        => new() { Hmi = new CrossReferenceHmiSelectorInfo { HmiName = hmiName, TagName = tagName } };
 
     private readonly Dictionary<string, CrossReferenceService> services = new();
 
