@@ -66,13 +66,13 @@ public class HmiAlarmReaderTests
     [Fact]
     public void ListMergesDiscreteAndAnalogSortedByName()
     {
-        var first = HmiAlarmReader.ListAlarms(Mixed(), null, null, 0, 3);
-        var second = HmiAlarmReader.ListAlarms(Mixed(), null, null, 3, 3);
+        var first = HmiAlarmReader.ListAlarms(Mixed(), null, null, Paged(0, 3), TestProject);
+        var second = HmiAlarmReader.ListAlarms(Mixed(), null, null, Paged(3, 3), TestProject);
 
         Assert.True(first.IsComplete);
         Assert.Equal(new[] { "a_an", "A_disc", "b_disc" }, first.Alarms.Select(a => a.Name));
         Assert.Equal(new[] { "analog", "discrete", "discrete" }, first.Alarms.Select(a => a.Kind));
-        Assert.Equal(new HmiPage(0, 3, 4, 3), first.Page);
+        Assert.Equal(new HmiPage(0, 3, 4, 3), first.Page with { SnapshotId = null });
         Assert.Equal(new[] { "c_an" }, second.Alarms.Select(a => a.Name));
         Assert.Null(second.Page.NextOffset);
 
@@ -103,8 +103,8 @@ public class HmiAlarmReaderTests
     [Fact]
     public void AlarmKindNarrows()
     {
-        var analogOnly = HmiAlarmReader.ListAlarms(Mixed(), "analog", null, 0, 10);
-        var discreteOnly = HmiAlarmReader.ListAlarms(Mixed(), "discrete", null, 0, 10);
+        var analogOnly = HmiAlarmReader.ListAlarms(Mixed(), "analog", null, Paged(0, 10), TestProject);
+        var discreteOnly = HmiAlarmReader.ListAlarms(Mixed(), "discrete", null, Paged(0, 10), TestProject);
 
         Assert.Equal(new[] { "a_an", "c_an" }, analogOnly.Alarms.Select(a => a.Name));
         Assert.Equal(2, analogOnly.Page.Total);
@@ -118,7 +118,7 @@ public class HmiAlarmReaderTests
     {
         var software = SoftwareWith(new[] { Discrete("d") }, new[] { Analog("a") });
 
-        var info = HmiAlarmReader.ListAlarms(software, null, null, 0, 10);
+        var info = HmiAlarmReader.ListAlarms(software, null, null, Paged(0, 10), TestProject);
 
         var discrete = info.Alarms.Single(a => a.Name == "d");
         Assert.Equal(new[] { "en-US", "pl-PL" }, discrete.EventText!.Select(t => t.Culture));
@@ -139,7 +139,7 @@ public class HmiAlarmReaderTests
     [Fact]
     public void LanguageNarrowsTheListTexts()
     {
-        var info = HmiAlarmReader.ListAlarms(SoftwareWith(new[] { Discrete("d") }, Array.Empty<HmiAnalogAlarm>()), null, "pl-PL", 0, 10);
+        var info = HmiAlarmReader.ListAlarms(SoftwareWith(new[] { Discrete("d") }, Array.Empty<HmiAnalogAlarm>()), null, "pl-PL", Paged(0, 10), TestProject);
 
         var alarm = Assert.Single(info.Alarms);
         Assert.Equal("<body><p>podniesiony</p></body>", Assert.Single(alarm.EventText!).Text);
@@ -152,7 +152,7 @@ public class HmiAlarmReaderTests
         bad.Failures["AcknowledgmentStateTag"] = new EngineeringTargetInvocationException("no ack state");
         bad.Failures["EventText"] = new EngineeringNotSupportedException("no event text");
 
-        var info = HmiAlarmReader.ListAlarms(SoftwareWith(new[] { bad }, Array.Empty<HmiAnalogAlarm>()), null, null, 0, 10);
+        var info = HmiAlarmReader.ListAlarms(SoftwareWith(new[] { bad }, Array.Empty<HmiAnalogAlarm>()), null, null, Paged(0, 10), TestProject);
 
         var row = Assert.Single(info.Alarms);
         Assert.Null(row.AcknowledgmentStateTag);
@@ -170,7 +170,7 @@ public class HmiAlarmReaderTests
         bad.Failures["Priority"] = new EngineeringObjectDisposedException("TIA Portal has been disposed.");
 
         var ex = Assert.Throws<WorkerOperationException>(
-            () => HmiAlarmReader.ListAlarms(SoftwareWith(new[] { bad }, Array.Empty<HmiAnalogAlarm>()), null, null, 0, 10));
+            () => HmiAlarmReader.ListAlarms(SoftwareWith(new[] { bad }, Array.Empty<HmiAnalogAlarm>()), null, null, Paged(0, 10), TestProject));
 
         Assert.Equal(WorkerFailureCategories.WorkerOperationFailed, ex.FailureCategory);
     }
@@ -181,7 +181,7 @@ public class HmiAlarmReaderTests
         var software = Mixed();
         software.AnalogAlarms.EnumerationFailure = new EngineeringTargetInvocationException("analog alarms unavailable");
 
-        var ex = Assert.Throws<WorkerOperationException>(() => HmiAlarmReader.ListAlarms(software, null, null, 0, 10));
+        var ex = Assert.Throws<WorkerOperationException>(() => HmiAlarmReader.ListAlarms(software, null, null, Paged(0, 10), TestProject));
 
         Assert.Equal(WorkerFailureCategories.WorkerOperationFailed, ex.FailureCategory);
     }
@@ -192,7 +192,7 @@ public class HmiAlarmReaderTests
         var software = Mixed();
         software.AnalogAlarms.EnumerationFailure = new EngineeringTargetInvocationException("analog alarms unavailable");
 
-        var info = HmiAlarmReader.ListAlarms(software, "discrete", null, 0, 10);
+        var info = HmiAlarmReader.ListAlarms(software, "discrete", null, Paged(0, 10), TestProject);
 
         Assert.Equal(2, info.Alarms.Count);
     }

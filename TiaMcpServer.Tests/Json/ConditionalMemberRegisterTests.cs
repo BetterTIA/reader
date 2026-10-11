@@ -52,6 +52,10 @@ public sealed class ConditionalMemberRegisterTests
         "ProjectRebindStateInfo.SourceContext",
         // Lifecycle effects include typed source context only for an active local owner.
         "LifecycleEffects.SourceContext",
+        // hmi_read, worker to host only: present when the worker held a snapshot because more rows exist.
+        "HmiPage.SnapshotId",
+        // hmi_read, host to caller only: present when more rows exist.
+        "HmiPage.NextCursor",
     };
 
     [Fact]

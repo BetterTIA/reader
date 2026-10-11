@@ -16,28 +16,39 @@ namespace TiaMcpServer.OpennessWorker.Openness.Hmi;
 /// </summary>
 public static class HmiValidationReader
 {
-    public static HmiValidationInfo Validate(HmiSoftware software, string category, string? name, int offset, int limit)
+    public static HmiValidationInfo Validate(
+        HmiSoftware software, string category, string? name, HmiPaging paging, object project)
     {
-        var scanned = Objects(software, category);
-        if (name is not null)
+        List<(object Item, string Name)> Scan()
         {
-            scanned = scanned.Where(o => string.Equals(o.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
-            if (scanned.Count == 0)
+            var scanned = Objects(software, category);
+            if (name is not null)
             {
-                throw new WorkerOperationException(
-                    WorkerFailureCategories.TargetNotFound,
-                    $"No '{category}' object named '{name}' was found. Use the list operations to see the objects.");
+                scanned = scanned.Where(o => string.Equals(o.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
+                if (scanned.Count == 0)
+                {
+                    throw new WorkerOperationException(
+                        WorkerFailureCategories.TargetNotFound,
+                        $"No '{category}' object named '{name}' was found. Use the list operations to see the objects.");
+                }
             }
+
+            return scanned;
         }
 
         var (items, page) = HmiPager.Page(
-            scanned, o => category == "all" ? KindOf(o.Item) + "\0" + o.Name : o.Name, offset, limit);
+            Scan, o => category == "all" ? KindOf(o.Item) + "\0" + o.Name : o.Name, paging, project, software);
         var info = new HmiValidationInfo { Page = page, Scanned = items.Count };
         var log = new HmiReadLog();
         var notValidatable = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var (item, itemName) in items)
         {
             var kind = KindOf(item);
+            if (!log.IsLive(paging, item, $"{kind} '{itemName}'"))
+            {
+                continue;
+            }
+
             if (item is not IValidator validator)
             {
                 notValidatable.Add(kind);

@@ -140,12 +140,12 @@ public class HmiScreenReaderTests
         var software = Plant();
         software.Screens.Items.Add(Screen("Items", items));
 
-        var first = HmiScreenReader.ListScreenItems(software, "items", 0, 2);
-        var second = HmiScreenReader.ListScreenItems(software, "Items", 2, 2);
+        var first = HmiScreenReader.ListScreenItems(software, "items", Paged(0, 2), TestProject);
+        var second = HmiScreenReader.ListScreenItems(software, "Items", Paged(2, 2), TestProject);
 
         Assert.Equal("Items", first.Screen);
         Assert.Equal(new[] { "Button_2", "view" }, first.Items.Select(i => i.Name));
-        Assert.Equal(new HmiPage(0, 2, 3, 2), first.Page);
+        Assert.Equal(new HmiPage(0, 2, 3, 2), first.Page with { SnapshotId = null });
         Assert.Equal("Window", Assert.Single(second.Items).Name);
         Assert.Null(second.Page.NextOffset);
 
@@ -176,7 +176,7 @@ public class HmiScreenReaderTests
         var software = Unified("Panel_RT");
         software.Screens.Items.Add(Screen("S", new HmiCircle { Name = "Round", Visible = true, Enabled = true }));
 
-        var list = HmiScreenReader.ListScreenItems(software, "S", 0, 10);
+        var list = HmiScreenReader.ListScreenItems(software, "S", Paged(0, 10), TestProject);
 
         Assert.True(list.IsComplete);
         Assert.Empty(list.Messages);
@@ -194,7 +194,7 @@ public class HmiScreenReaderTests
         failing.Failures["Left"] = new EngineeringTargetInvocationException("no left");
         software.Screens.Items.Add(Screen("S", failing));
 
-        var list = HmiScreenReader.ListScreenItems(software, "S", 0, 10);
+        var list = HmiScreenReader.ListScreenItems(software, "S", Paged(0, 10), TestProject);
 
         Assert.False(list.IsComplete);
         var broken = Assert.Single(list.Items);
@@ -207,8 +207,8 @@ public class HmiScreenReaderTests
     {
         var software = Plant();
 
-        var items = Assert.Throws<WorkerOperationException>(() => HmiScreenReader.ListScreenItems(software, "Nope", 0, 10));
-        var faceplates = Assert.Throws<WorkerOperationException>(() => HmiScreenReader.ListFaceplateInstances(software, "Nope", 0, 10));
+        var items = Assert.Throws<WorkerOperationException>(() => HmiScreenReader.ListScreenItems(software, "Nope", Paged(0, 10), TestProject));
+        var faceplates = Assert.Throws<WorkerOperationException>(() => HmiScreenReader.ListFaceplateInstances(software, "Nope", Paged(0, 10), TestProject));
 
         Assert.Equal(WorkerFailureCategories.TargetNotFound, items.FailureCategory);
         Assert.Equal(WorkerFailureCategories.TargetNotFound, faceplates.FailureCategory);
@@ -221,7 +221,7 @@ public class HmiScreenReaderTests
         var software = Unified("Panel_RT");
         software.Screens.Items.Add(Screen("S", Faceplate("FP", @"V0.0.3\FP_Estop", ("Tag", "Motor1"), ("Enabled", false), ("Unset", null)), new HmiButton { Name = "NotAFaceplate" }));
 
-        var list = HmiScreenReader.ListFaceplateInstances(software, "S", 0, 10);
+        var list = HmiScreenReader.ListFaceplateInstances(software, "S", Paged(0, 10), TestProject);
 
         Assert.True(list.IsComplete);
         var instance = Assert.Single(list.Instances);
@@ -240,7 +240,7 @@ public class HmiScreenReaderTests
         container.Failures["Interface"] = new EngineeringTargetInvocationException("no interface");
         software.Screens.Items.Add(Screen("S", container));
 
-        var ex = Assert.Throws<WorkerOperationException>(() => HmiScreenReader.ListFaceplateInstances(software, null, 0, 10));
+        var ex = Assert.Throws<WorkerOperationException>(() => HmiScreenReader.ListFaceplateInstances(software, null, Paged(0, 10), TestProject));
 
         Assert.Equal(WorkerFailureCategories.WorkerOperationFailed, ex.FailureCategory);
         Assert.Contains("FP", ex.Message);
@@ -249,12 +249,12 @@ public class HmiScreenReaderTests
     [Fact]
     public void FaceplateWithoutScreenNameScansAllScreens()
     {
-        var all = HmiScreenReader.ListFaceplateInstances(Plant(), null, 0, 2);
-        var rest = HmiScreenReader.ListFaceplateInstances(Plant(), null, 2, 2);
-        var one = HmiScreenReader.ListFaceplateInstances(Plant(), "Deep", 0, 10);
+        var all = HmiScreenReader.ListFaceplateInstances(Plant(), null, Paged(0, 2), TestProject);
+        var rest = HmiScreenReader.ListFaceplateInstances(Plant(), null, Paged(2, 2), TestProject);
+        var one = HmiScreenReader.ListFaceplateInstances(Plant(), "Deep", Paged(0, 10), TestProject);
 
         Assert.Equal(new[] { ("Deep", "FP_deep"), ("Detail", "FP_a") }, all.Instances.Select(i => (i.Screen, i.Container)));
-        Assert.Equal(new HmiPage(0, 2, 3, 2), all.Page);
+        Assert.Equal(new HmiPage(0, 2, 3, 2), all.Page with { SnapshotId = null });
         Assert.Equal(("Detail", "FP_b"), (rest.Instances.Single().Screen, rest.Instances.Single().Container));
         Assert.Equal("FP_deep", Assert.Single(one.Instances).Container);
     }

@@ -10,6 +10,12 @@ internal static class HmiTestProjects
 {
     public static HmiSoftware Unified(string name) => new() { Name = name };
 
+    /// <summary>The project a paged reader test holds its snapshots under.</summary>
+    public static readonly object TestProject = new();
+
+    /// <summary>Fresh-scan paging for reader tests.</summary>
+    public static TiaMcpServer.OpennessWorker.Openness.Hmi.HmiPaging Paged(int offset, int limit) => new(offset, limit, "test", null);
+
     public static Siemens.Engineering.Hmi.HmiTarget Classic(string name) => new() { Name = name };
 
     /// <summary>A device whose single depth-1 item hosts <paramref name="software"/>.</summary>

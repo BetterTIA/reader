@@ -31,4 +31,7 @@ public class HmiQueryInfo
     public string? Category { get; set; }
 
     public string? Name { get; set; }
+
+    /// <summary>The worker snapshot a continuation pages; null for a fresh scan.</summary>
+    public string? SnapshotId { get; set; }
 }

@@ -56,16 +56,21 @@ public static class HmiTagReader
         };
     }
 
-    public static HmiTagListInfo ListTags(HmiSoftware software, string? tableName, string? language, int offset, int limit)
+    public static HmiTagListInfo ListTags(
+        HmiSoftware software, string? tableName, string? language, HmiPaging paging, object project)
     {
-        var source = tableName is null
-            ? HmiReadLog.Guard(() => software.Tags.ToList(), "The tags")
-            : TagsOfTables(software, tableName);
+        IEnumerable<(HmiTag Tag, string Name)> Scan()
+            => (tableName is null
+                    ? HmiReadLog.Guard(() => software.Tags.ToList(), "The tags")
+                    : TagsOfTables(software, tableName))
+                .Select(t => (Tag: t, Name: TagName(t)));
 
-        var named = source.Select(t => (Tag: t, Name: TagName(t))).ToList();
-        var (items, page) = HmiPager.Page(named, n => n.Name, offset, limit);
+        var (items, page) = HmiPager.Page(Scan, n => n.Name, paging, project, software);
         var log = new HmiReadLog();
-        var rows = items.Select(n => ReadRow(n.Tag, language, log)).ToList();
+        var rows = items
+            .Where(n => log.IsLive(paging, n.Tag, $"Tag '{n.Name}'"))
+            .Select(n => ReadRow(n.Tag, language, log))
+            .ToList();
 
         return new HmiTagListInfo { IsComplete = log.IsComplete, Messages = log.Messages, Page = page, Tags = rows };
     }
@@ -103,13 +108,18 @@ public static class HmiTagReader
         return detail;
     }
 
-    public static HmiSystemTagListInfo ListSystemTags(HmiSoftware software, int offset, int limit)
+    public static HmiSystemTagListInfo ListSystemTags(HmiSoftware software, HmiPaging paging, object project)
     {
-        var systemTags = HmiReadLog.Guard(() => software.SystemTags.ToList(), "The system tags");
-        var named = systemTags.Select(s => (Tag: s, Name: HmiReadLog.Guard(() => s.Name, "A system tag name"))).ToList();
-        var (items, page) = HmiPager.Page(named, n => n.Name, offset, limit);
+        var (items, page) = HmiPager.Page(
+            () => HmiReadLog.Guard(() => software.SystemTags.ToList(), "The system tags")
+                .Select(s => (Tag: s, Name: HmiReadLog.Guard(() => s.Name, "A system tag name"))),
+            n => n.Name,
+            paging,
+            project,
+            software);
         var log = new HmiReadLog();
         var rows = items
+            .Where(n => log.IsLive(paging, n.Tag, $"System tag '{n.Name}'"))
             .Select(n => new HmiSystemTagInfo
             {
                 Name = n.Name,
@@ -121,45 +131,50 @@ public static class HmiTagReader
     }
 
     public static HmiLoggingTagListInfo ListLoggingTags(
-        HmiSoftware software, string? dataLogName, string? tagName, int offset, int limit)
+        HmiSoftware software, string? dataLogName, string? tagName, HmiPaging paging, object project)
     {
-        if (dataLogName is not null)
-        {
-            HmiLogReader.RequireDataLog(software, dataLogName);
-        }
-
         var log = new HmiReadLog();
-        var tags = HmiReadLog.Guard(() => software.Tags.ToList(), "The tags");
-        if (tagName is not null)
+        IEnumerable<NamedLoggingTag> Scan()
         {
-            tags = tags.Where(t => string.Equals(TagName(t), tagName, StringComparison.OrdinalIgnoreCase)).ToList();
-            if (tags.Count == 0)
+            if (dataLogName is not null)
             {
-                throw NotFound($"Tag '{tagName}' was not found.");
+                HmiLogReader.RequireDataLog(software, dataLogName);
             }
-        }
 
-        var rows = new List<HmiLoggingTagRowInfo>();
-        foreach (var tag in tags)
-        {
-            rows.AddRange(ReadLoggingTags(tag, TagName(tag), log));
-        }
+            var tags = HmiReadLog.Guard(() => software.Tags.ToList(), "The tags");
+            if (tagName is not null)
+            {
+                tags = tags.Where(t => string.Equals(TagName(t), tagName, StringComparison.OrdinalIgnoreCase)).ToList();
+                if (tags.Count == 0)
+                {
+                    throw NotFound($"Tag '{tagName}' was not found.");
+                }
+            }
 
-        if (dataLogName is not null)
-        {
-            rows = rows.Where(r => string.Equals(r.DataLog, dataLogName, StringComparison.OrdinalIgnoreCase)).ToList();
+            var rows = tags.SelectMany(t => NamedLoggingTags(t, TagName(t)));
+            return dataLogName is null
+                ? rows
+                : rows.Where(r => string.Equals(
+                    log.Try(() => r.Source.DataLog, $"Property DataLog of logging tag '{r.Name}'"),
+                    dataLogName,
+                    StringComparison.OrdinalIgnoreCase));
         }
 
         // Logging tag names are only unique per owning tag, so the owner completes the sort key.
-        var (items, page) = HmiPager.Page(rows, r => r.Name + "\0" + r.Tag, offset, limit);
+        var (items, page) = HmiPager.Page(Scan, r => r.Name + "\0" + r.Tag, paging, project, software);
         return new HmiLoggingTagListInfo
         {
+            Page = page,
+            LoggingTags = items
+                .Where(r => log.IsLive(paging, r.Source, $"Logging tag '{r.Name}' of tag '{r.Tag}'"))
+                .Select(r => ReadLoggingTag(r, log))
+                .ToList(),
             IsComplete = log.IsComplete,
             Messages = log.Messages,
-            Page = page,
-            LoggingTags = items.ToList(),
         };
     }
+
+    private readonly record struct NamedLoggingTag(HmiLoggingTag Source, string Name, string Tag);
 
     private static HmiTagRowInfo ReadRow(HmiTag tag, string? language, HmiReadLog log)
     {
@@ -235,26 +250,28 @@ public static class HmiTagReader
     }
 
     private static List<HmiLoggingTagRowInfo> ReadLoggingTags(HmiTag tag, string tagName, HmiReadLog log)
-    {
-        var loggingTags = HmiReadLog.Guard(() => tag.LoggingTags.ToList(), $"The logging tags of tag '{tagName}'");
-        return loggingTags
-            .Select(l =>
-            {
-                var name = HmiReadLog.Guard(() => l.Name, $"A logging tag name of tag '{tagName}'");
-                string What(string property) => $"Property {property} of logging tag '{name}'";
-                return new HmiLoggingTagRowInfo
-                {
-                    Name = name,
-                    Tag = tagName,
-                    DataLog = log.Try(() => l.DataLog, What("DataLog")),
-                    LoggingMode = log.Try(() => l.LoggingMode.ToString(), What("LoggingMode")),
-                    Cycle = log.Try(() => l.Cycle, What("Cycle")),
-                    TriggerMode = log.Try(() => l.TriggerMode.ToString(), What("TriggerMode")),
-                    HighLimit = log.ReadVariant(() => l.HighLimit, $"Property HighLimit of '{name}'"),
-                    LowLimit = log.ReadVariant(() => l.LowLimit, $"Property LowLimit of '{name}'"),
-                };
-            })
+        => NamedLoggingTags(tag, tagName).Select(l => ReadLoggingTag(l, log)).ToList();
+
+    private static List<NamedLoggingTag> NamedLoggingTags(HmiTag tag, string tagName)
+        => HmiReadLog.Guard(() => tag.LoggingTags.ToList(), $"The logging tags of tag '{tagName}'")
+            .Select(l => new NamedLoggingTag(l, HmiReadLog.Guard(() => l.Name, $"A logging tag name of tag '{tagName}'"), tagName))
             .ToList();
+
+    private static HmiLoggingTagRowInfo ReadLoggingTag(NamedLoggingTag named, HmiReadLog log)
+    {
+        var (l, name, tagName) = named;
+        string What(string property) => $"Property {property} of logging tag '{name}'";
+        return new HmiLoggingTagRowInfo
+        {
+            Name = name,
+            Tag = tagName,
+            DataLog = log.Try(() => l.DataLog, What("DataLog")),
+            LoggingMode = log.Try(() => l.LoggingMode.ToString(), What("LoggingMode")),
+            Cycle = log.Try(() => l.Cycle, What("Cycle")),
+            TriggerMode = log.Try(() => l.TriggerMode.ToString(), What("TriggerMode")),
+            HighLimit = log.ReadVariant(() => l.HighLimit, $"Property HighLimit of '{name}'"),
+            LowLimit = log.ReadVariant(() => l.LowLimit, $"Property LowLimit of '{name}'"),
+        };
     }
 
     private static HmiRangeInfo? ReadRange(HmiReadLog log, string tagName, string property, Func<Siemens.Engineering.HmiUnified.HmiTags.Range?> read)

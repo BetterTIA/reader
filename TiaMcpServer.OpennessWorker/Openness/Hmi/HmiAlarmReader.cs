@@ -22,11 +22,15 @@ public static class HmiAlarmReader
 
     private readonly record struct Entry(string Kind, AlarmBase Alarm, string Name);
 
-    public static HmiAlarmListInfo ListAlarms(HmiSoftware software, string? alarmKind, string? language, int offset, int limit)
+    public static HmiAlarmListInfo ListAlarms(
+        HmiSoftware software, string? alarmKind, string? language, HmiPaging paging, object project)
     {
-        var (items, page) = HmiPager.Page(Entries(software, alarmKind), e => e.Name, offset, limit);
+        var (items, page) = HmiPager.Page(() => Entries(software, alarmKind), e => e.Name, paging, project, software);
         var log = new HmiReadLog();
-        var rows = items.Select(e => ReadRow(e, language, log)).ToList();
+        var rows = items
+            .Where(e => log.IsLive(paging, e.Alarm, $"The {e.Kind} alarm '{e.Name}'"))
+            .Select(e => ReadRow(e, language, log))
+            .ToList();
         return new HmiAlarmListInfo { IsComplete = log.IsComplete, Messages = log.Messages, Page = page, Alarms = rows };
     }
 

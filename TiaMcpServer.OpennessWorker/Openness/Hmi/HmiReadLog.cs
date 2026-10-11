@@ -73,6 +73,34 @@ internal sealed class HmiReadLog
     }
 
     /// <summary>
+    /// A continuation reads its held objects live (spec §4.4): one deleted since the first page throws
+    /// <see cref="EngineeringObjectDisposedException"/> on its name and fails only its row. A fresh scan has just
+    /// read every name, so it needs no probe; any other failure is left to the row read.
+    /// </summary>
+    public bool IsLive(HmiPaging paging, object held, string what)
+    {
+        if (paging.Snapshot is null || held is not IEngineeringObject engineeringObject)
+        {
+            return true;
+        }
+
+        try
+        {
+            engineeringObject.GetAttribute("Name");
+            return true;
+        }
+        catch (EngineeringObjectDisposedException)
+        {
+            Fail($"{what} no longer exists; it was deleted after the first page was read.");
+            return false;
+        }
+        catch (EngineeringException)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>
     /// Openness reports an unsupported property on the current device as <see cref="EngineeringTargetInvocationException"/>
     /// or <see cref="EngineeringNotSupportedException"/>; those are recoverable per property. Anything else
     /// (a disposed object after the Portal died, a security failure) fails the whole item.

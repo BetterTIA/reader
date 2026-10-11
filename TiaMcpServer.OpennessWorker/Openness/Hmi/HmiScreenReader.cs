@@ -49,46 +49,64 @@ public static class HmiScreenReader
         };
     }
 
-    public static HmiScreenItemListInfo ListScreenItems(HmiSoftware software, string screenName, int offset, int limit)
+    public static HmiScreenItemListInfo ListScreenItems(
+        HmiSoftware software, string screenName, HmiPaging paging, object project)
     {
-        var (name, screen) = FindScreen(software, screenName);
-        var items = HmiReadLog.Guard(() => screen.ScreenItems.ToList(), $"The items of screen '{name}'")
-            .Select(i => (Item: i, Name: HmiReadLog.Guard(() => i.Name, $"A screen item name of screen '{name}'")))
-            .ToList();
-        var (page, pageInfo) = HmiPager.Page(items, i => i.Name, offset, limit);
+        string? screen = null;
+        IEnumerable<(string Screen, HmiScreenItemBase Item, string Name)> Scan()
+        {
+            var (name, found) = FindScreen(software, screenName);
+            screen = name;
+            return HmiReadLog.Guard(() => found.ScreenItems.ToList(), $"The items of screen '{name}'")
+                .Select(i => (name, i, HmiReadLog.Guard(() => i.Name, $"A screen item name of screen '{name}'")));
+        }
+
+        var (page, pageInfo) = HmiPager.Page(Scan, i => i.Name, paging, project, software);
         var log = new HmiReadLog();
         return new HmiScreenItemListInfo
         {
-            Screen = name,
+            // A continuation does not walk the screens again; its held rows carry the screen name.
+            Screen = screen ?? (page.Count > 0 ? page[0].Screen : screenName),
             Page = pageInfo,
-            Items = page.Select(i => ReadItem(i.Item, i.Name, log)).ToList(),
+            Items = page
+                .Where(i => log.IsLive(paging, i.Item, $"Screen item '{i.Name}' of screen '{i.Screen}'"))
+                .Select(i => ReadItem(i.Item, i.Name, log))
+                .ToList(),
             IsComplete = log.IsComplete,
             Messages = log.Messages,
         };
     }
 
     public static HmiFaceplateInstanceListInfo ListFaceplateInstances(
-        HmiSoftware software, string? screenName, int offset, int limit)
+        HmiSoftware software, string? screenName, HmiPaging paging, object project)
     {
-        var screens = screenName is null ? AllScreens(software) : new List<(string, HmiScreen)> { FindScreen(software, screenName) };
-        var containers = new List<(string Screen, string Container, HmiFaceplateContainer Source)>();
-        foreach (var (name, screen) in screens)
+        List<(string Screen, string Container, HmiFaceplateContainer Source)> Scan()
         {
-            foreach (var item in HmiReadLog.Guard(() => screen.ScreenItems.ToList(), $"The items of screen '{name}'"))
+            var screens = screenName is null ? AllScreens(software) : new List<(string, HmiScreen)> { FindScreen(software, screenName) };
+            var containers = new List<(string Screen, string Container, HmiFaceplateContainer Source)>();
+            foreach (var (name, screen) in screens)
             {
-                if (item is HmiFaceplateContainer container)
+                foreach (var item in HmiReadLog.Guard(() => screen.ScreenItems.ToList(), $"The items of screen '{name}'"))
                 {
-                    containers.Add((name, HmiReadLog.Guard(() => container.Name, $"A screen item name of screen '{name}'"), container));
+                    if (item is HmiFaceplateContainer container)
+                    {
+                        containers.Add((name, HmiReadLog.Guard(() => container.Name, $"A screen item name of screen '{name}'"), container));
+                    }
                 }
             }
+
+            return containers;
         }
 
-        var (page, pageInfo) = HmiPager.Page(containers, c => c.Screen + "\0" + c.Container, offset, limit);
+        var (page, pageInfo) = HmiPager.Page(Scan, c => c.Screen + "\0" + c.Container, paging, project, software);
         var log = new HmiReadLog();
         return new HmiFaceplateInstanceListInfo
         {
             Page = pageInfo,
-            Instances = page.Select(c => ReadFaceplate(c.Screen, c.Container, c.Source, log)).ToList(),
+            Instances = page
+                .Where(c => log.IsLive(paging, c.Source, $"Faceplate instance '{c.Container}' of screen '{c.Screen}'"))
+                .Select(c => ReadFaceplate(c.Screen, c.Container, c.Source, log))
+                .ToList(),
             IsComplete = log.IsComplete,
             Messages = log.Messages,
         };

@@ -35,21 +35,21 @@ public class HmiValidationReaderTests
         tags[4].Results.Add(Finding("DataType", warning: "odd type"));
         software.Tags.Items.AddRange(tags.Reverse());
 
-        var first = HmiValidationReader.Validate(software, "tags", null, 0, 2);
+        var first = HmiValidationReader.Validate(software, "tags", null, Paged(0, 2), TestProject);
 
-        Assert.Equal(new HmiPage(0, 2, 5, 2), first.Page);
+        Assert.Equal(new HmiPage(0, 2, 5, 2), first.Page with { SnapshotId = null });
         Assert.Equal(2, first.Scanned);
         Assert.Equal(2, first.Clean);
         Assert.Empty(first.Findings);
         Assert.Equal(new[] { 1, 1, 0, 0, 0 }, tags.Select(t => t.ValidateCalls));
 
-        var second = HmiValidationReader.Validate(software, "tags", null, 2, 2);
+        var second = HmiValidationReader.Validate(software, "tags", null, Paged(2, 2), TestProject);
 
         Assert.Equal(2, second.Scanned);
         Assert.Equal(1, second.Clean);
         Assert.Equal("t3", Assert.Single(second.Findings).Name);
 
-        var last = HmiValidationReader.Validate(software, "tags", null, 4, 2);
+        var last = HmiValidationReader.Validate(software, "tags", null, Paged(4, 2), TestProject);
 
         Assert.Equal(new HmiPage(4, 2, 5, null), last.Page);
         Assert.Equal(1, last.Scanned);
@@ -65,7 +65,7 @@ public class HmiValidationReaderTests
         bad.Results.Add(Finding("InitialAddress", error: "empty", warning: "unusual"));
         software.Connections.Items.AddRange(new[] { new HmiConnection { Name = "PLC_1" }, bad, new HmiConnection { Name = "PLC_3" } });
 
-        var info = HmiValidationReader.Validate(software, "connections", null, 0, 100);
+        var info = HmiValidationReader.Validate(software, "connections", null, Paged(0, 100), TestProject);
 
         Assert.True(info.IsComplete);
         Assert.Empty(info.Messages);
@@ -86,13 +86,13 @@ public class HmiValidationReaderTests
         var software = Unified("Panel_RT");
         software.Screens.Items.AddRange(new[] { new HmiScreen { Name = "Start" }, new HmiScreen { Name = "Other" } });
 
-        var info = HmiValidationReader.Validate(software, "screens", "start", 0, 100);
+        var info = HmiValidationReader.Validate(software, "screens", "start", Paged(0, 100), TestProject);
 
         Assert.Equal(1, info.Scanned);
         Assert.Equal(1, info.Page.Total);
         Assert.Equal(1, info.Clean);
 
-        var ex = Assert.Throws<WorkerOperationException>(() => HmiValidationReader.Validate(software, "screens", "Nope", 0, 100));
+        var ex = Assert.Throws<WorkerOperationException>(() => HmiValidationReader.Validate(software, "screens", "Nope", Paged(0, 100), TestProject));
         Assert.Equal(WorkerFailureCategories.TargetNotFound, ex.FailureCategory);
     }
 
@@ -107,7 +107,7 @@ public class HmiValidationReaderTests
         software.Screens.Items.Add(Failing(new HmiScreen { Name = "b" }));
         software.Tags.Items.AddRange(new[] { Failing(Tag("c")), Failing(Tag("A")) });
 
-        var info = HmiValidationReader.Validate(software, "all", null, 0, 100);
+        var info = HmiValidationReader.Validate(software, "all", null, Paged(0, 100), TestProject);
 
         Assert.Equal(7, info.Scanned);
         Assert.Equal(
@@ -130,7 +130,7 @@ public class HmiValidationReaderTests
         software.Tags.Items.AddRange(new[] { Tag("t1"), Tag("t2") });
         software.SystemTags.Items.AddRange(new[] { new HmiSystemTag { Name = "@a" }, new HmiSystemTag { Name = "@b" }, new HmiSystemTag { Name = "@c" } });
 
-        var info = HmiValidationReader.Validate(software, category, null, 0, 100);
+        var info = HmiValidationReader.Validate(software, category, null, Paged(0, 100), TestProject);
 
         Assert.Equal(2, info.Scanned);
         Assert.DoesNotContain("HmiSystemTag", info.NotValidatable);
@@ -144,7 +144,7 @@ public class HmiValidationReaderTests
         var broken = new HmiDiscreteAlarm { Name = "Broken", ValidateFailure = new EngineeringTargetInvocationException("not supported here") };
         software.DiscreteAlarms.Items.AddRange(new[] { new HmiDiscreteAlarm { Name = "Fine" }, broken });
 
-        var info = HmiValidationReader.Validate(software, "alarms", null, 0, 100);
+        var info = HmiValidationReader.Validate(software, "alarms", null, Paged(0, 100), TestProject);
 
         Assert.False(info.IsComplete);
         Assert.Equal(2, info.Scanned);
@@ -168,7 +168,7 @@ public class HmiValidationReaderTests
         });
         software.Tags.Items.AddRange(new[] { tag, Tag("u") });
 
-        var info = HmiValidationReader.Validate(software, "tags", null, 0, 100);
+        var info = HmiValidationReader.Validate(software, "tags", null, Paged(0, 100), TestProject);
 
         Assert.Equal(2, info.Scanned);
         Assert.Equal(1, info.Clean);
@@ -186,7 +186,7 @@ public class HmiValidationReaderTests
         nullErrors.Results.Add(new HmiValidationResult { PropertyName = "P", Errors = null });
         software.Connections.Items.AddRange(new[] { nullList, nullErrors, new HmiConnection { Name = "c" } });
 
-        var info = HmiValidationReader.Validate(software, "connections", null, 0, 100);
+        var info = HmiValidationReader.Validate(software, "connections", null, Paged(0, 100), TestProject);
 
         Assert.Equal(3, info.Scanned);
         Assert.Equal(1, info.Clean);
@@ -201,7 +201,7 @@ public class HmiValidationReaderTests
         var software = Unified("Panel_RT");
         software.Tags.Items.Add(new HmiTag { Name = "t", ValidateFailure = new EngineeringObjectDisposedException("gone") });
 
-        var ex = Assert.Throws<WorkerOperationException>(() => HmiValidationReader.Validate(software, "tags", null, 0, 100));
+        var ex = Assert.Throws<WorkerOperationException>(() => HmiValidationReader.Validate(software, "tags", null, Paged(0, 100), TestProject));
 
         Assert.Equal(WorkerFailureCategories.WorkerOperationFailed, ex.FailureCategory);
     }
@@ -212,7 +212,7 @@ public class HmiValidationReaderTests
         var software = Unified("Panel_RT");
         software.Connections.EnumerationFailure = new EngineeringTargetInvocationException("gone");
 
-        var ex = Assert.Throws<WorkerOperationException>(() => HmiValidationReader.Validate(software, "connections", null, 0, 100));
+        var ex = Assert.Throws<WorkerOperationException>(() => HmiValidationReader.Validate(software, "connections", null, Paged(0, 100), TestProject));
 
         Assert.Equal(WorkerFailureCategories.WorkerOperationFailed, ex.FailureCategory);
     }
@@ -228,8 +228,8 @@ public class HmiValidationReaderTests
         software.HmiAlarmAuditClass.Items.Add(new Siemens.Engineering.HmiUnified.HmiAudit.HmiAlarmAuditClass { Name = "u" });
         software.OpcUaAlarmTypes.Items.Add(new Siemens.Engineering.HmiUnified.HmiOpcUaAlarm.HmiOpcUaAlarmType { Name = "o" });
 
-        Assert.Equal(3, HmiValidationReader.Validate(software, "logs", null, 0, 100).Scanned);
-        Assert.Equal(3, HmiValidationReader.Validate(software, "alarmClasses", null, 0, 100).Scanned);
+        Assert.Equal(3, HmiValidationReader.Validate(software, "logs", null, Paged(0, 100), TestProject).Scanned);
+        Assert.Equal(3, HmiValidationReader.Validate(software, "alarmClasses", null, Paged(0, 100), TestProject).Scanned);
     }
 
     [Fact]
