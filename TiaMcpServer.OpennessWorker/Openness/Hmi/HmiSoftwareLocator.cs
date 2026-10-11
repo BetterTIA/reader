@@ -64,6 +64,7 @@ public static class HmiSoftwareLocator
     public static DiscoveredHmiSoftware FindUnique(ProjectBase project, string? hmiName)
     {
         Found? match = null;
+        Found? classicSeen = null;
         foreach (var found in Walk(project, messages: null))
         {
             if (hmiName is null
@@ -71,6 +72,7 @@ public static class HmiSoftwareLocator
                 : !string.Equals(found.SoftwareName, hmiName, StringComparison.OrdinalIgnoreCase)
                     && !string.Equals(found.DeviceName, hmiName, StringComparison.OrdinalIgnoreCase))
             {
+                classicSeen ??= found.Kind == KindClassic ? found : null;
                 continue;
             }
 
@@ -84,6 +86,13 @@ public static class HmiSoftwareLocator
             match = found;
         }
 
+        if (match is null && classicSeen is not null && hmiName is null)
+        {
+            throw new WorkerOperationException(
+                WorkerFailureCategories.TargetKindUnsupported,
+                $"The project's HMI '{classicSeen.SoftwareName}' on device '{classicSeen.DeviceName}' is a Classic (WinCC) HMI; only WinCC Unified HMIs are supported.");
+        }
+
         if (match is null)
         {
             throw new WorkerOperationException(
@@ -95,7 +104,7 @@ public static class HmiSoftwareLocator
         {
             throw new WorkerOperationException(
                 WorkerFailureCategories.TargetKindUnsupported,
-                $"HMI '{match.SoftwareName}' on device '{match.DeviceName}' is a Classic (WinCC) HMI; hmi_read supports WinCC Unified only.");
+                $"HMI '{match.SoftwareName}' on device '{match.DeviceName}' is a Classic (WinCC) HMI; only WinCC Unified HMIs are supported.");
         }
 
         return new DiscoveredHmiSoftware(match.DeviceName, unified);
