@@ -43,8 +43,9 @@ public class HmiReadTools
         var batch = await StructuredOperationBatchExecutionEngine.ExecuteReadsAsync(
             operations,
             operation => HmiWorkerInvoker.InvokeReadAsync(workerClient, cursorCodec, operation, CancellationToken.None),
-            // ponytail: binding captured after the worker call; a rebind in between clears the worker
-            // snapshot, so the continuation fails snapshot_unavailable rather than reading stale data.
+            // ponytail: binding captured after the worker call; a rebind in between is not cleared from the
+            // worker store, but a continuation under the new project fails cursor_snapshot_mismatch at
+            // HmiSnapshotStore.Take (project Equals check) rather than reading stale data.
             (operation, result) => HmiPayloadContract.Project(operation, result, cursorCodec, workerClient.BindingSnapshot))
             .ConfigureAwait(false);
 
