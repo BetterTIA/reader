@@ -1,9 +1,12 @@
 using System.Reflection;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using TiaMcpServer.Json;
+using TiaMcpServer.Network;
 using TiaMcpServer.OperationBatches;
 using TiaMcpServer.Worker;
 using TiaMcpServer.Contracts.Hmi;
+using TiaMcpServer.Contracts.Project;
 using TiaMcpServer.Contracts.Worker;
 
 namespace TiaMcpServer.Hmi;
@@ -46,10 +49,19 @@ public static class HmiPayloadContract
     public static StructuredOperationItem Project(HmiOperationRequest operation, WorkerCallResult workerResult)
         => Project(operation, workerResult, Console.Error.WriteLine);
 
+    /// <summary>Projects a result and replaces a worker <c>page.snapshotId</c> with a sealed <c>page.nextCursor</c>.</summary>
+    public static StructuredOperationItem Project(
+        HmiOperationRequest operation,
+        WorkerCallResult workerResult,
+        HmiPageCursorCodec codec,
+        ProjectBindingSnapshot binding)
+        => Project(operation, workerResult, Console.Error.WriteLine, (codec, binding));
+
     internal static StructuredOperationItem Project(
         HmiOperationRequest operation,
         WorkerCallResult workerResult,
-        Action<string> writeProtocolDiagnostic)
+        Action<string> writeProtocolDiagnostic,
+        (HmiPageCursorCodec Codec, ProjectBindingSnapshot Binding)? cursorIssuer = null)
     {
         var warnings = workerResult.Warnings ?? Array.Empty<string>();
         if (!workerResult.Success)
@@ -67,14 +79,15 @@ public static class HmiPayloadContract
                 operation.OperationId,
                 operation.Operation,
                 OperationBatchStatus.Succeeded,
-                Decode(operation, workerResult.Payload),
+                IssueNextCursor(operation, Decode(operation, workerResult.Payload), cursorIssuer),
                 Failure: null,
                 Omission: null,
                 SkipReason: null,
                 warnings);
         }
-        catch (JsonException)
+        catch (Exception exception) when (exception is JsonException or HmiPageCursorException)
         {
+            // An unsealable worker snapshot id is a worker contract violation like any undecodable payload.
             // Server-side diagnostic only: names the operation, never the rejected payload.
             try
             {
@@ -107,6 +120,38 @@ public static class HmiPayloadContract
             .MakeGenericMethod(type)
             .CreateDelegate(typeof(Func<string, JsonElement>));
         return normalize(payload);
+    }
+
+    /// <summary>
+    /// The worker snapshot id never reaches the caller: it is removed, and while more rows exist it is
+    /// sealed into <c>page.nextCursor</c> at <c>page.nextOffset</c>.
+    /// </summary>
+    private static JsonElement IssueNextCursor(
+        HmiOperationRequest operation,
+        JsonElement result,
+        (HmiPageCursorCodec Codec, ProjectBindingSnapshot Binding)? cursorIssuer)
+    {
+        if (!result.TryGetProperty("page", out var page) || !page.TryGetProperty("snapshotId", out var snapshotId))
+        {
+            return result;
+        }
+
+        var root = JsonNode.Parse(result.GetRawText())!.AsObject();
+        var pageNode = root["page"]!.AsObject();
+        pageNode.Remove("snapshotId");
+        if (cursorIssuer is { } issuer
+            && snapshotId.ValueKind == JsonValueKind.String
+            && page.GetProperty("nextOffset").ValueKind == JsonValueKind.Number)
+        {
+            pageNode["nextCursor"] = issuer.Codec.Encode(new HmiPageCursorState(
+                snapshotId.GetString()!,
+                operation.Operation,
+                HmiPageCursorCodec.QueryHash(operation),
+                page.GetProperty("nextOffset").GetInt32(),
+                ProjectBindingCursorState.FromSnapshot(issuer.Binding, preserveUnboundEpoch: true)));
+        }
+
+        return JsonSerializer.SerializeToElement(root);
     }
 
     private static JsonElement NormalizeAs<T>(string payload)

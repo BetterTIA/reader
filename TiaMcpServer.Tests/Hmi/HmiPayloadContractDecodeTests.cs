@@ -1,6 +1,8 @@
 using System.Text.Json;
 using TiaMcpServer.Contracts.Hmi;
 using TiaMcpServer.Contracts.Json;
+using TiaMcpServer.Contracts.Project;
+using TiaMcpServer.Cursors;
 using TiaMcpServer.Contracts.Worker;
 using TiaMcpServer.Hmi;
 using TiaMcpServer.OperationBatches;
@@ -156,6 +158,41 @@ public class HmiPayloadContractDecodeTests
         var item = HmiPayloadContract.Project(Op("list_project_languages"), WorkerCallResult.Ok(json));
 
         Assert.Equal(JsonValueKind.Null, item.Result!.Value.GetProperty("referenceLanguage").ValueKind);
+    }
+
+    private static readonly HmiPageCursorCodec Codec = new(AuthenticatedCursorProtector.CreateProcessScoped());
+
+    private static readonly ProjectBindingSnapshot Binding = new(
+        ProjectBindingSnapshot.VerifiedState, "binding-a", 3, @"C:\Projects\Hmi.ap21", "worker-a", 1, 123, null);
+
+    [Fact]
+    public void Project_PageWithSnapshotId_EmitsNextCursorAndNoSnapshotId()
+    {
+        var request = new HmiOperationRequest { OperationId = "a", Operation = "list_tags", TableName = "T", Limit = 2 };
+        var json = WorkerJson.SerializePayload(new HmiTagListInfo { Page = new HmiPage(0, 2, 5, 2) { SnapshotId = "s1" } });
+
+        var item = HmiPayloadContract.Project(request, WorkerCallResult.Ok(json), Codec, Binding);
+
+        var page = item.Result!.Value.GetProperty("page");
+        Assert.False(page.TryGetProperty("snapshotId", out _));
+        var state = Codec.Decode(page.GetProperty("nextCursor").GetString()!);
+        Assert.Equal("s1", state.SnapshotId);
+        Assert.Equal("list_tags", state.Operation);
+        Assert.Equal(HmiPageCursorCodec.QueryHash(request), state.QueryHash);
+        Assert.Equal(2, state.Offset);
+        Assert.True(state.HostBinding.Matches(Binding, preserveUnboundEpoch: true));
+    }
+
+    [Fact]
+    public void Project_LastPage_HasNoNextCursor()
+    {
+        var json = WorkerJson.SerializePayload(new HmiTagListInfo { Page = new HmiPage(4, 2, 5, null) });
+
+        var item = HmiPayloadContract.Project(Op("list_tags"), WorkerCallResult.Ok(json), Codec, Binding);
+
+        var page = item.Result!.Value.GetProperty("page");
+        Assert.False(page.TryGetProperty("nextCursor", out _));
+        Assert.False(page.TryGetProperty("snapshotId", out _));
     }
 
     [Theory]

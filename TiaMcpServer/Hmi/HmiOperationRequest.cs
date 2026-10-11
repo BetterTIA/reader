@@ -29,6 +29,9 @@ public sealed class HmiOperationRequest : IOperationBatchItem
     [Description("Paged operations only: rows per page, 1 to 2000. Default 100.")]
     public int? Limit { get; set; }
 
+    [Description("Paged operations only: page.nextCursor from a previous call with the same operation and filters; continues that snapshot. Not valid with offset.")]
+    public string? Cursor { get; set; }
+
     [Description("Optional slash-separated group names below the root collection (exact, case-sensitive), for list_tag_tables and list_screens.")]
     public string? GroupPath { get; set; }
 

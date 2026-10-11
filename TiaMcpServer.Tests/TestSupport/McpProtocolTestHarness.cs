@@ -177,6 +177,8 @@ internal sealed class McpProtocolTestHarness : IAsyncDisposable
         collection.AddSingleton(_ => AuthenticatedCursorProtector.CreateProcessScoped());
         collection.AddSingleton(sp => new ProjectTreeCursorCodec(
             sp.GetRequiredService<AuthenticatedCursorProtector>()));
+        collection.AddSingleton(sp => new TiaMcpServer.Hmi.HmiPageCursorCodec(
+            sp.GetRequiredService<AuthenticatedCursorProtector>()));
         collection.AddSingleton(sp => new ProjectTreeSnapshotStore(TimeProvider.System));
         collection.AddSingleton(sp => new ProjectTreePageProjector(
             sp.GetRequiredService<ProjectTreeCursorCodec>()));

@@ -47,7 +47,7 @@ public static class HmiOperationCatalog
         ["validate"] = Op(new[] { "category" }, new[] { "hmiName", "name" }, paged: true),
     };
 
-    private static readonly string[] PagingFields = { "offset", "limit" };
+    private static readonly string[] PagingFields = { "offset", "limit", "cursor" };
 
     private static readonly IReadOnlySet<string> AlarmKinds = new HashSet<string>(StringComparer.Ordinal)
     {
@@ -65,6 +65,7 @@ public static class HmiOperationCatalog
         ("language", op => op.Language is not null),
         ("offset", op => op.Offset is not null),
         ("limit", op => op.Limit is not null),
+        ("cursor", op => op.Cursor is not null),
         ("groupPath", op => op.GroupPath is not null),
         ("tableName", op => op.TableName is not null),
         ("tagName", op => op.TagName is not null),
@@ -254,6 +255,11 @@ public static class HmiOperationCatalog
         if (operation.Offset is < 0)
         {
             errors.Add($"{prefix}: 'offset' must be 0 or greater.");
+        }
+
+        if (operation.Cursor is not null && operation.Offset is not null)
+        {
+            errors.Add($"{prefix}: 'cursor' is not valid with 'offset'; the cursor carries the position.");
         }
 
         if (operation.Language is not null && !IsValidCulture(operation.Language))

@@ -38,7 +38,7 @@ public class HmiReadFakeWorkerTests
         using var uiOpen = FakeWorkerUiOpenProject.ForWorkerRelativePath(Scenario);
         using var client = CreateClient();
 
-        var result = await HmiReadTools.HmiRead(client, new[]
+        var result = await HmiReadTools.HmiRead(client, new HmiPageCursorCodec(TiaMcpServer.Cursors.AuthenticatedCursorProtector.CreateProcessScoped()), new[]
         {
             Op("devices", "list_hmi_devices"),
             Op("tags", "list_tags", r => r.HmiName = "HMI_1"),
@@ -68,7 +68,7 @@ public class HmiReadFakeWorkerTests
             using var uiOpen = FakeWorkerUiOpenProject.ForWorkerRelativePath(Scenario);
             using var client = CreateClient();
 
-            var result = await HmiReadTools.HmiRead(client, new[]
+            var result = await HmiReadTools.HmiRead(client, new HmiPageCursorCodec(TiaMcpServer.Cursors.AuthenticatedCursorProtector.CreateProcessScoped()), new[]
             {
                 Op("tags", "list_tags", r => { r.HmiName = "HMI_1"; r.TableName = "Motors"; r.Offset = 5; r.Limit = 7; }),
             });
@@ -90,7 +90,7 @@ public class HmiReadFakeWorkerTests
         using var uiOpen = FakeWorkerUiOpenProject.ForWorkerRelativePath(Scenario);
         using var client = CreateClient();
 
-        var result = await HmiReadTools.HmiRead(client, new[] { Op("sys", "list_system_tags", r => r.HmiName = "HMI_1") });
+        var result = await HmiReadTools.HmiRead(client, new HmiPageCursorCodec(TiaMcpServer.Cursors.AuthenticatedCursorProtector.CreateProcessScoped()), new[] { Op("sys", "list_system_tags", r => r.HmiName = "HMI_1") });
 
         var item = Items(result)[0];
         Assert.Equal("failed", item.GetProperty("status").GetString());

@@ -428,7 +428,7 @@ public sealed class ToolOutputContractConformanceTests
         {
             var document = result.StructuredContent!.Value;
             Assert.Equal("hmi_read", document.GetProperty("tool").GetString());
-            Assert.Equal("1.0", document.GetProperty("contractVersion").GetString());
+            Assert.Equal("1.1", document.GetProperty("contractVersion").GetString());
             Assert.Equal(System.Text.Json.JsonValueKind.Array, document.GetProperty("warnings").ValueKind);
             Assert.Equal(
                 probe.ExpectIsError ? System.Text.Json.JsonValueKind.Null : System.Text.Json.JsonValueKind.Object,
