@@ -20,6 +20,12 @@ public static class HmiPager
     public static (IReadOnlyList<T> Items, HmiPage Page) Page<T>(
         Func<IEnumerable<T>> scan, Func<T, string> name, HmiPaging paging, object project, HmiSoftware software)
     {
+        if (paging.Snapshot is { } live)
+        {
+            // A dead Portal or a deleted HMI fails the item, as on a fresh scan; only a deleted row object fails just its row.
+            HmiReadLog.Guard(() => live.Software.Name, "The HMI software of the page snapshot");
+        }
+
         var ordered = paging.Snapshot is { } held ? held.Ordered.Cast<T>().ToList() : InNameOrder(scan(), name).ToList();
         var items = ordered.Skip(paging.Offset).Take(paging.Limit).ToList();
         var end = (long)paging.Offset + paging.Limit; // long: offset is not bounded above, so int addition could wrap negative

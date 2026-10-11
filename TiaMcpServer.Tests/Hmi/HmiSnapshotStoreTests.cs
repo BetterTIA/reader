@@ -117,4 +117,20 @@ public class HmiSnapshotStoreTests
         Assert.Contains(second.Messages, m => m.Contains("'c'"));
         Assert.Null(second.Page.SnapshotId);
     }
+
+    [Fact]
+    public void Continuation_SoftwareGone_FailsTheItem()
+    {
+        var project = new object();
+        var software = new HmiSoftware();
+        software.Tags.Items.AddRange(new[] { "a", "b", "c" }.Select(n => new HmiTag { Name = n }));
+        var first = HmiTagReader.ListTags(software, null, null, new HmiPaging(0, 2, Op, null), project);
+        var snapshot = HmiSnapshotStore.Shared.Take(project, first.Page.SnapshotId!, Op);
+
+        software.NameFailure = new EngineeringObjectDisposedException("TIA Portal has been disposed.");
+        var ex = Assert.Throws<WorkerOperationException>(
+            () => HmiTagReader.ListTags(snapshot.Software, null, null, new HmiPaging(2, 2, Op, snapshot), project));
+
+        Assert.Equal(WorkerFailureCategories.WorkerOperationFailed, ex.FailureCategory);
+    }
 }
