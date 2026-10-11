@@ -195,7 +195,7 @@ public static class HmiScreenReader
                     ScreenNumber = log.Try(() => (int?)s.ScreenNumber, What("ScreenNumber")),
                     Width = log.Try(() => (long?)s.Width, What("Width")),
                     Height = log.Try(() => (long?)s.Height, What("Height")),
-                    ItemCount = HmiReadLog.Guard(() => s.ScreenItems.Count(), $"The items of screen '{name}'"),
+                    ItemCount = HmiReadLog.Guard(() => s.ScreenItems.Count, $"The items of screen '{name}'"),
                 };
             })
             .ToList();
@@ -265,6 +265,13 @@ public static class HmiScreenReader
 
     private static (string Name, HmiScreen Screen) FindScreen(HmiSoftware software, string screenName)
     {
+        // Exact root hit skips the full walk; case variants and group screens fall through to the scan.
+        var exact = HmiReadLog.Guard(() => software.Screens.Find(screenName), $"Screen '{screenName}'");
+        if (exact is not null)
+        {
+            return (screenName, exact);
+        }
+
         var matches = AllScreens(software)
             .Where(s => string.Equals(s.Name, screenName, StringComparison.OrdinalIgnoreCase))
             .ToList();

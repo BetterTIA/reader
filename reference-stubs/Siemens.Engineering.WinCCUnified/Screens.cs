@@ -38,6 +38,7 @@ namespace Siemens.Engineering.HmiUnified.UI.Base
     }
     public abstract class HmiScreenItemBaseComposition : global::Siemens.Engineering.IEngineeringComposition, global::Siemens.Engineering.IEngineeringInstance, global::System.Collections.Generic.IEnumerable<HmiScreenItemBase>
     {
+        public int Count { get => throw new global::System.NotSupportedException(); }
         public global::System.Collections.Generic.IEnumerator<HmiScreenItemBase> GetEnumerator() => throw new global::System.NotSupportedException();
         global::Siemens.Engineering.IEngineeringObject global::Siemens.Engineering.IEngineeringComposition.Create(global::System.Type type, global::System.Collections.Generic.IEnumerable<global::System.Collections.Generic.KeyValuePair<string, object>> parameters) => throw new global::System.NotSupportedException();
         global::Siemens.Engineering.IEngineeringObject global::Siemens.Engineering.IEngineeringInstance.Parent => throw new global::System.NotSupportedException();
@@ -87,6 +88,7 @@ namespace Siemens.Engineering.HmiUnified.UI.Screens
     }
     public abstract class HmiScreenComposition : global::Siemens.Engineering.IEngineeringComposition, global::Siemens.Engineering.IEngineeringInstance, global::System.Collections.Generic.IEnumerable<HmiScreen>
     {
+        public HmiScreen Find(string name) => throw new global::System.NotSupportedException();
         public global::System.Collections.Generic.IEnumerator<HmiScreen> GetEnumerator() => throw new global::System.NotSupportedException();
         global::Siemens.Engineering.IEngineeringObject global::Siemens.Engineering.IEngineeringComposition.Create(global::System.Type type, global::System.Collections.Generic.IEnumerable<global::System.Collections.Generic.KeyValuePair<string, object>> parameters) => throw new global::System.NotSupportedException();
         global::Siemens.Engineering.IEngineeringObject global::Siemens.Engineering.IEngineeringInstance.Parent => throw new global::System.NotSupportedException();

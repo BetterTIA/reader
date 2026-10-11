@@ -62,6 +62,7 @@ namespace Siemens.Engineering.HmiUnified.HmiTags
     }
     public abstract class HmiTagComposition : global::Siemens.Engineering.IEngineeringComposition, global::Siemens.Engineering.IEngineeringInstance, global::System.Collections.Generic.IEnumerable<HmiTag>
     {
+        public HmiTag Find(string name) => throw new global::System.NotSupportedException();
         public global::System.Collections.Generic.IEnumerator<HmiTag> GetEnumerator() => throw new global::System.NotSupportedException();
         global::Siemens.Engineering.IEngineeringObject global::Siemens.Engineering.IEngineeringComposition.Create(global::System.Type type, global::System.Collections.Generic.IEnumerable<global::System.Collections.Generic.KeyValuePair<string, object>> parameters) => throw new global::System.NotSupportedException();
         global::Siemens.Engineering.IEngineeringObject global::Siemens.Engineering.IEngineeringInstance.Parent => throw new global::System.NotSupportedException();

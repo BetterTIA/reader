@@ -72,7 +72,7 @@ public static class HmiTagReader
 
     public static HmiTagDetailInfo GetTag(HmiSoftware software, string tagName, string? language)
     {
-        var tag = FindUniqueTag(software, tagName);
+        var tag = HmiTagLookup.FindUnique(software, tagName);
         var log = new HmiReadLog();
         var name = TagName(tag);
         var walk = new MemberWalk();
@@ -321,25 +321,6 @@ public static class HmiTagReader
     internal static List<(object Item, string Name)> NamedSystemTags(HmiSoftware software)
         => HmiReadLog.Guard(() => software.SystemTags.ToList(), "The system tags")
             .Select(s => ((object)s, HmiReadLog.Guard(() => s.Name, "A system tag name"))).ToList();
-
-    private static HmiTag FindUniqueTag(HmiSoftware software, string tagName)
-    {
-        var matches = HmiReadLog.Guard(() => software.Tags.ToList(), "The tags")
-            .Where(t => string.Equals(TagName(t), tagName, StringComparison.OrdinalIgnoreCase))
-            .ToList();
-        if (matches.Count == 0)
-        {
-            throw NotFound($"Tag '{tagName}' was not found. Use list_tags to see the tags.");
-        }
-
-        if (matches.Count > 1)
-        {
-            throw new WorkerOperationException(
-                WorkerFailureCategories.TargetAmbiguous, $"Several tags are named '{tagName}'.");
-        }
-
-        return matches[0];
-    }
 
     private static HmiTagTableGroup ResolveGroup(HmiSoftware software, string groupPath)
     {

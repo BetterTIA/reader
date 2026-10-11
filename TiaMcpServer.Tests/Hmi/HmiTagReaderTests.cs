@@ -255,11 +255,31 @@ public class HmiTagReaderTests
     }
 
     [Fact]
+    public void GetTag_ExactName_UsesFind_NoEnumeration()
+    {
+        var software = SoftwareWith(Table("T1", Tag("Motor_1"), Tag("Motor_2")));
+
+        var info = HmiTagReader.GetTag(software, "Motor_2", null);
+
+        Assert.Equal("Motor_2", info.Tag.Name);
+        Assert.Equal(0, software.Tags.YieldedItemCount);
+    }
+
+    [Fact]
+    public void GetTag_CaseVariant_FallsBackToScan()
+    {
+        var software = SoftwareWith(Table("T1", Tag("motor_1")));
+
+        Assert.Null(software.Tags.Find("Motor_1"));
+        Assert.Equal("motor_1", HmiTagReader.GetTag(software, "Motor_1", null).Tag.Name);
+    }
+
+    [Fact]
     public void GetTagDuplicateNameIsTargetAmbiguous()
     {
-        var software = SoftwareWith(Table("T1", Tag("a")), Table("T2", Tag("A", "T2")));
+        var software = SoftwareWith(Table("T1", Tag("Ab")), Table("T2", Tag("AB", "T2")));
 
-        var ex = Assert.Throws<WorkerOperationException>(() => HmiTagReader.GetTag(software, "a", null));
+        var ex = Assert.Throws<WorkerOperationException>(() => HmiTagReader.GetTag(software, "aB", null));
 
         Assert.Equal(WorkerFailureCategories.TargetAmbiguous, ex.FailureCategory);
     }

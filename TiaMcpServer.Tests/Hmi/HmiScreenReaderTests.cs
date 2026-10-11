@@ -90,6 +90,18 @@ public class HmiScreenReaderTests
     }
 
     [Fact]
+    public void ListScreens_ItemCount_UsesCompositionCount()
+    {
+        var software = Plant();
+        var start = software.Screens.Items.Single(s => s.Name == "Start");
+
+        var tree = HmiScreenReader.ListScreens(software, null, null);
+
+        Assert.Equal(2, tree.Screens.Single(s => s.Name == "Start").ItemCount);
+        Assert.Equal(0, start.ScreenItems.YieldedItemCount);
+    }
+
+    [Fact]
     public void ScreenTreeBelowAGroupPathAndLanguageNarrowing()
     {
         var tree = HmiScreenReader.ListScreens(Plant(), "Plant/Sub", "pl-PL");
