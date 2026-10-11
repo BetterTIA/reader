@@ -17,6 +17,7 @@ using static TiaMcpServer.Tests.Hmi.HmiTestProjects;
 
 namespace TiaMcpServer.Tests.Hmi;
 
+[Collection(HmiSnapshotStoreCollection.Name)]
 public class HmiValidationReaderTests
 {
     private static HmiValidationResult Finding(string property, string? error = null, string? warning = null) => new()

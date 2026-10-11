@@ -8,6 +8,7 @@ using Xunit;
 
 namespace TiaMcpServer.Tests.Hmi;
 
+[Collection(HmiSnapshotStoreCollection.Name)]
 public class HmiSnapshotStoreTests
 {
     private const string Op = "hmi_list_tags";

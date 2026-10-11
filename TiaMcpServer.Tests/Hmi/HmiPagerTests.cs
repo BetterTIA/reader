@@ -4,6 +4,7 @@ using Xunit;
 
 namespace TiaMcpServer.Tests.Hmi;
 
+[Collection(HmiSnapshotStoreCollection.Name)]
 public class HmiPagerTests
 {
     private const string Op = "hmi_list_tags";

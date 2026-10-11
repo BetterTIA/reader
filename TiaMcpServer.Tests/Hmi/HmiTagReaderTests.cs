@@ -12,6 +12,7 @@ using static TiaMcpServer.Tests.Hmi.HmiTestProjects;
 
 namespace TiaMcpServer.Tests.Hmi;
 
+[Collection(HmiSnapshotStoreCollection.Name)]
 public class HmiTagReaderTests
 {
     private static HmiTag Tag(string name, string table = "T1", string dataType = "Int") => new()

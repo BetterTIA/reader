@@ -16,6 +16,7 @@ using static TiaMcpServer.Tests.Hmi.HmiTestProjects;
 
 namespace TiaMcpServer.Tests.Hmi;
 
+[Collection(HmiSnapshotStoreCollection.Name)]
 public class HmiScreenReaderTests
 {
     private static HmiScreen Screen(string name, params HmiScreenItemBase[] items)

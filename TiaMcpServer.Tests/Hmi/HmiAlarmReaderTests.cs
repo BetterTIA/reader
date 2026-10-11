@@ -14,6 +14,7 @@ using static TiaMcpServer.Tests.Hmi.HmiTestProjects;
 
 namespace TiaMcpServer.Tests.Hmi;
 
+[Collection(HmiSnapshotStoreCollection.Name)]
 public class HmiAlarmReaderTests
 {
     private const string NoTag = "<No tag>";
