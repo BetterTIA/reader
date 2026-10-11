@@ -137,7 +137,7 @@ public class CrossReferenceReadToolsTests
     [Theory]
     [InlineData("""{"hmi":{"hmiName":"HMI_RT_1","tagName":"Tag1","member":"x"}}""", "member")]
     [InlineData("""{"hmi":{"tagName":"Tag1"}}""", "hmiName")]
-    public void HmiSelector_UnknownKey_IsValidationError(string json, string key)
+    public void HmiSelector_UnknownOrMissingKey_IsRejectedAtBinding(string json, string key)
     {
         // The SDK binds arguments with these rules, so an unknown or missing key never reaches the tool.
         var exception = Assert.Throws<JsonException>(

@@ -366,10 +366,6 @@ public static class HmiTagReader
     internal static IEnumerable<(object Item, string Name)> LoggingTagObjects(HmiTag tag, string tagName)
         => NamedLoggingTags(tag, tagName).Select(l => ((object)l.Source, tagName + "/" + l.Name));
 
-    internal static List<(object Item, string Name)> NamedSystemTags(HmiSoftware software)
-        => HmiReadLog.Guard(() => software.SystemTags.ToList(), "The system tags")
-            .Select(s => ((object)s, HmiReadLog.Guard(() => s.Name, "A system tag name"))).ToList();
-
     private static HmiTagTableGroup ResolveGroup(HmiSoftware software, string groupPath)
     {
         IEnumerable<HmiTagTableGroup> level = HmiReadLog.Guard(() => software.TagTableGroups.ToList(), "The tag table groups");
