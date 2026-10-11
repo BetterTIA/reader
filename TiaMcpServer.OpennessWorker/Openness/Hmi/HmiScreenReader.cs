@@ -281,6 +281,15 @@ public static class HmiScreenReader
     internal static List<(object Item, string Name)> NamedScreens(HmiSoftware software)
         => AllScreens(software).Select(s => ((object)s.Screen, s.Name)).ToList();
 
+    /// <summary>The items of one screen, named <c>Screen/Item</c>, for <c>validate</c>.</summary>
+    internal static List<(object Item, string Name)> NamedScreenItems(HmiSoftware software, string screenName)
+    {
+        var (name, found) = FindScreen(software, screenName);
+        return HmiReadLog.Guard(() => found.ScreenItems.ToList(), $"The items of screen '{name}'")
+            .Select(i => ((object)i, name + "/" + HmiReadLog.Guard(() => i.Name, $"A screen item name of screen '{name}'")))
+            .ToList();
+    }
+
     private static (string Name, HmiScreen Screen) FindScreen(HmiSoftware software, string screenName)
     {
         // Exact root hit skips the full walk; case variants and group screens fall through to the scan.

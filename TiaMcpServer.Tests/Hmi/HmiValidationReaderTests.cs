@@ -5,7 +5,9 @@ using Siemens.Engineering.HmiUnified.HmiConnections;
 using Siemens.Engineering.HmiUnified.HmiLogging;
 using Siemens.Engineering.HmiUnified.HmiTags;
 using Siemens.Engineering.HmiUnified.LoggingTags;
+using Siemens.Engineering.HmiUnified.UI.Base;
 using Siemens.Engineering.HmiUnified.UI.Screens;
+using Siemens.Engineering.HmiUnified.UI.Widgets;
 using TiaMcpServer.Contracts.Hmi;
 using TiaMcpServer.Contracts.Worker;
 using TiaMcpServer.OpennessWorker.Openness.Hmi;
@@ -230,6 +232,125 @@ public class HmiValidationReaderTests
 
         Assert.Equal(3, HmiValidationReader.Validate(software, "logs", null, Paged(0, 100), TestProject).Scanned);
         Assert.Equal(3, HmiValidationReader.Validate(software, "alarmClasses", null, Paged(0, 100), TestProject).Scanned);
+    }
+
+    [Fact]
+    public void Validate_MemberTags_RecursesWithDottedNames()
+    {
+        var software = Unified("Panel_RT");
+        var motor = Tag("Motor_1");
+        var pid = Tag("Pid");
+        pid.Members.Items.Add(Tag("Kp"));
+        motor.Members.Items.AddRange(new[] { Tag("Speed"), pid });
+        software.Tags.Items.AddRange(new[] { motor, Tag("Other") });
+
+        var info = HmiValidationReader.Validate(software, "memberTags", "motor_1", Paged(0, 100), TestProject);
+
+        Assert.Equal(3, info.Scanned);
+        Assert.Equal(3, info.Clean);
+        Assert.Equal(new[] { 1, 1, 1 }, new[] { motor.Members.Items[0], pid, pid.Members.Items[0] }.Select(t => t.ValidateCalls));
+    }
+
+    [Fact]
+    public void Validate_MemberTags_NamesAppearInFindings()
+    {
+        var software = Unified("Panel_RT");
+        var motor = Tag("Motor_1");
+        var pid = Tag("Pid");
+        var kp = Tag("Kp");
+        kp.Results.Add(Finding("Address", error: "bad"));
+        pid.Members.Items.Add(kp);
+        motor.Members.Items.AddRange(new[] { Tag("Speed"), pid });
+        software.Tags.Items.Add(motor);
+
+        var info = HmiValidationReader.Validate(software, "memberTags", "Motor_1", Paged(0, 100), TestProject);
+
+        var finding = Assert.Single(info.Findings);
+        Assert.Equal(("HmiTag", "Motor_1.Pid.Kp"), (finding.ObjectKind, finding.Name));
+    }
+
+    [Fact]
+    public void Validate_MemberTags_StopsAtMaxDepth()
+    {
+        var software = Unified("Panel_RT");
+        var root = Tag("Motor_1");
+        var parent = root;
+        for (var i = 1; i <= 10; i++)
+        {
+            var child = Tag("c" + i);
+            parent.Members.Items.Add(child);
+            parent = child;
+        }
+
+        software.Tags.Items.Add(root);
+
+        var info = HmiValidationReader.Validate(software, "memberTags", "Motor_1", Paged(0, 100), TestProject);
+
+        Assert.Equal(HmiTagReader.MaxMemberDepth, info.Scanned);
+    }
+
+    [Fact]
+    public void Validate_MemberTags_UnknownTagIsTargetNotFound()
+    {
+        var software = Unified("Panel_RT");
+
+        var ex = Assert.Throws<WorkerOperationException>(
+            () => HmiValidationReader.Validate(software, "memberTags", "Nope", Paged(0, 100), TestProject));
+
+        Assert.Equal(WorkerFailureCategories.TargetNotFound, ex.FailureCategory);
+    }
+
+    [Fact]
+    public void Validate_LoggingTags_NamesTagSlashLog()
+    {
+        var software = Unified("Panel_RT");
+        var tag = Tag("Temp_1");
+        var bad = new HmiLoggingTag { Name = "Log_1" };
+        bad.Results.Add(Finding("Cycle", error: "bad"));
+        tag.LoggingTags.Items.AddRange(new[] { bad, new HmiLoggingTag { Name = "Log_2" } });
+        software.Tags.Items.AddRange(new[] { tag, Tag("Other") });
+
+        var info = HmiValidationReader.Validate(software, "loggingTags", "Temp_1", Paged(0, 100), TestProject);
+
+        Assert.Equal(2, info.Scanned);
+        Assert.Equal(1, info.Clean);
+        var finding = Assert.Single(info.Findings);
+        Assert.Equal(("HmiLoggingTag", "Temp_1/Log_1"), (finding.ObjectKind, finding.Name));
+    }
+
+    [Fact]
+    public void Validate_ScreenItems_OnlyNamedScreen()
+    {
+        var software = Unified("Panel_RT");
+        var main = new HmiScreen { Name = "Main" };
+        main.ScreenItems.Items.AddRange(new HmiScreenItemBase[] { new HmiButton { Name = "Button_3" }, new HmiButton { Name = "Button_4" } });
+        var other = new HmiScreen { Name = "Other" };
+        other.ScreenItems.Items.Add(new HmiButton { Name = "Button_9" });
+        software.Screens.Items.AddRange(new[] { main, other });
+
+        var info = HmiValidationReader.Validate(software, "screenItems", "main", Paged(0, 100), TestProject);
+
+        Assert.Equal(2, info.Scanned);
+        Assert.Equal(2, info.Page.Total);
+        Assert.Equal(new[] { "HmiButton" }, info.NotValidatable);
+    }
+
+    [Fact]
+    public void Validate_All_UnchangedObjectSet()
+    {
+        var software = Unified("Panel_RT");
+        var tag = Tag("Motor_1");
+        tag.Members.Items.Add(Tag("Speed"));
+        tag.LoggingTags.Items.Add(new HmiLoggingTag { Name = "Log_1" });
+        var screen = new HmiScreen { Name = "Main" };
+        screen.ScreenItems.Items.Add(new HmiButton { Name = "Button_3" });
+        software.Tags.Items.Add(tag);
+        software.Screens.Items.Add(screen);
+
+        var info = HmiValidationReader.Validate(software, "all", null, Paged(0, 100), TestProject);
+
+        Assert.Equal(2, info.Scanned);
+        Assert.Empty(info.NotValidatable);
     }
 
     [Fact]

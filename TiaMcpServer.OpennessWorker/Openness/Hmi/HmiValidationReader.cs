@@ -21,6 +21,12 @@ public static class HmiValidationReader
     {
         List<(object Item, string Name)> Scan()
         {
+            if (NameScoped.Contains(category))
+            {
+                // The name selects the owning tag or screen, not an object of the category.
+                return ScopedObjects(software, category, name);
+            }
+
             var scanned = Objects(software, category);
             if (name is not null)
             {
@@ -123,7 +129,28 @@ public static class HmiValidationReader
 
         return results;
     }
+
     private static string KindOf(object item) => item.GetType().Name;
+
+    private static readonly HashSet<string> NameScoped = new(StringComparer.Ordinal) { "memberTags", "loggingTags", "screenItems" };
+
+    private static List<(object Item, string Name)> ScopedObjects(HmiSoftware software, string category, string? name)
+    {
+        if (name is null)
+        {
+            throw new WorkerOperationException(
+                WorkerFailureCategories.ValidationError, $"Category '{category}' requires a name.");
+        }
+
+        if (category == "screenItems")
+        {
+            return HmiScreenReader.NamedScreenItems(software, name);
+        }
+
+        var tag = HmiTagLookup.FindUnique(software, name);
+        var tagName = HmiReadLog.Guard(() => tag.Name, "A tag name");
+        return (category == "memberTags" ? HmiTagReader.MemberObjects(tag, tagName) : HmiTagReader.LoggingTagObjects(tag, tagName)).ToList();
+    }
 
     private static List<(object Item, string Name)> Objects(HmiSoftware software, string category) => category switch
     {

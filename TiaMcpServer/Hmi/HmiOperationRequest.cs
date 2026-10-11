@@ -53,9 +53,9 @@ public sealed class HmiOperationRequest : IOperationBatchItem
     [Description("Screen name. Required by list_screen_items; optional filter for list_faceplate_instances.")]
     public string? ScreenName { get; set; }
 
-    [Description("validate category: tags, alarms, screens, connections, logs, alarmClasses or all. Required by validate.")]
+    [Description("validate category: tags, alarms, screens, connections, logs, alarmClasses or all (not part of all: memberTags, loggingTags, screenItems, which need name). Required by validate.")]
     public string? Category { get; set; }
 
-    [Description("validate: narrows to one object of the given category; not valid with category all.")]
+    [Description("validate: narrows to one object of the given category; not valid with category all. For memberTags and loggingTags it is the tag name, for screenItems the screen name; required for those three.")]
     public string? Name { get; set; }
 }

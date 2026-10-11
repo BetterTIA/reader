@@ -57,6 +57,12 @@ public static class HmiOperationCatalog
     private static readonly IReadOnlySet<string> Categories = new HashSet<string>(StringComparer.Ordinal)
     {
         "tags", "alarms", "screens", "connections", "logs", "alarmClasses", "all",
+        "memberTags", "loggingTags", "screenItems",
+    };
+
+    private static readonly IReadOnlySet<string> NameRequiredCategories = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "memberTags", "loggingTags", "screenItems",
     };
 
     private static readonly (string Name, Func<HmiOperationRequest, bool> IsSet)[] OperationFields =
@@ -279,6 +285,11 @@ public static class HmiOperationCatalog
         else if (operation.Name is not null && operation.Category == "all")
         {
             errors.Add($"{prefix}: 'name' is not valid with category all.");
+        }
+
+        if (operation.Category is { } named && NameRequiredCategories.Contains(named) && string.IsNullOrWhiteSpace(operation.Name))
+        {
+            errors.Add($"{prefix}: 'name' is required for category {named}.");
         }
 
         if (operation.GroupPath is not null && operation.GroupPath.Split('/').Any(string.IsNullOrWhiteSpace))

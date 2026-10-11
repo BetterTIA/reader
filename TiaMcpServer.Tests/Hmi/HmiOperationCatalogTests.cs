@@ -232,6 +232,33 @@ public class HmiOperationCatalogTests
     }
 
     [Theory]
+    [InlineData("memberTags")]
+    [InlineData("loggingTags")]
+    [InlineData("screenItems")]
+    public void Validate_NewCategory_WithoutName_IsValidationError(string category)
+    {
+        var request = Build("validate", Array.Empty<string>());
+        request.Category = category;
+
+        var result = HmiOperationCatalog.ValidateRead(new[] { request });
+
+        Assert.False(result.IsValid);
+        Assert.Contains("'name'", result.Error);
+    }
+
+    [Theory]
+    [InlineData("memberTags")]
+    [InlineData("loggingTags")]
+    [InlineData("screenItems")]
+    public void Validate_NewCategoriesAccepted(string category)
+    {
+        var request = Build("validate", new[] { "name" });
+        request.Category = category;
+
+        Assert.True(HmiOperationCatalog.ValidateRead(new[] { request }).IsValid);
+    }
+
+    [Theory]
     [InlineData("A//B")]
     [InlineData("/A")]
     [InlineData("A/")]

@@ -335,6 +335,37 @@ public static class HmiTagReader
     internal static List<(object Item, string Name)> NamedTags(HmiSoftware software)
         => HmiReadLog.Guard(() => software.Tags.ToList(), "The tags").Select(t => ((object)t, TagName(t))).ToList();
 
+    /// <summary>The members of a tag at every depth up to <see cref="MaxMemberDepth"/>, named <c>Parent.Member</c>, for <c>validate</c>.</summary>
+    internal static IEnumerable<(object Item, string Name)> MemberObjects(HmiTag tag, string tagName)
+    {
+        var members = HmiReadLog.Guard(() => tag.Members.ToList(), $"The members of tag '{tagName}'");
+        return MemberObjects(members, tagName, 0);
+    }
+
+    private static IEnumerable<(object Item, string Name)> MemberObjects(List<HmiTag> members, string parentName, int depth)
+    {
+        // Same cut as ReadMembers: members below MaxMemberDepth levels are not read.
+        if (depth >= MaxMemberDepth)
+        {
+            yield break;
+        }
+
+        foreach (var member in members)
+        {
+            var name = parentName + "." + TagName(member);
+            yield return (member, name);
+            var children = HmiReadLog.Guard(() => member.Members.ToList(), $"The members of tag '{name}'");
+            foreach (var child in MemberObjects(children, name, depth + 1))
+            {
+                yield return child;
+            }
+        }
+    }
+
+    /// <summary>The logging tags of a tag, named <c>Tag/LoggingTag</c>, for <c>validate</c>.</summary>
+    internal static IEnumerable<(object Item, string Name)> LoggingTagObjects(HmiTag tag, string tagName)
+        => NamedLoggingTags(tag, tagName).Select(l => ((object)l.Source, tagName + "/" + l.Name));
+
     internal static List<(object Item, string Name)> NamedSystemTags(HmiSoftware software)
         => HmiReadLog.Guard(() => software.SystemTags.ToList(), "The system tags")
             .Select(s => ((object)s, HmiReadLog.Guard(() => s.Name, "A system tag name"))).ToList();
