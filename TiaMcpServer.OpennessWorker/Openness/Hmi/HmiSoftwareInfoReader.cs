@@ -237,7 +237,7 @@ public static class HmiSoftwareInfoReader
     }
 
     /// <summary>Settings Openness reports as unsupported on Comfort panels; noted, not a read failure.</summary>
-    private static readonly IReadOnlySet<string> KnownUnsupported = new HashSet<string>
+    private static readonly ISet<string> KnownUnsupported = new HashSet<string>(StringComparer.Ordinal)
     {
         "GMPEnabled", "GeneralESIGCommentsStrategy", "TagOptimizationActive",
     };
