@@ -62,7 +62,12 @@ namespace Siemens.Engineering
     public sealed class MultilingualTextItem
     {
         public Language Language { get; set; } = new();
-        public string Text { get; set; } = string.Empty;
+        private string text = string.Empty;
+        public string Text
+        {
+            get => TextFailure is null ? text : throw TextFailure;
+            set => text = value;
+        }
         public Exception? TextFailure { get; set; }
     }
 

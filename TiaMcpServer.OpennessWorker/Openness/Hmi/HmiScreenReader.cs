@@ -174,7 +174,7 @@ public static class HmiScreenReader
                 return new HmiFaceplateBindingInfo
                 {
                     PropertyName = property,
-                    Value = HmiAlarmReader.ReadVariant(() => b.Value, log, $"Value of interface property '{property}' of faceplate container '{container}'"),
+                    Value = log.ReadVariant(() => b.Value, $"Value of interface property '{property}' of faceplate container '{container}'"),
                 };
             })
             .ToList();
@@ -191,7 +191,7 @@ public static class HmiScreenReader
                 return new HmiScreenInfo
                 {
                     Name = name,
-                    DisplayName = HmiAlarmReader.ReadText(() => s.DisplayName, language, log, What("DisplayName")),
+                    DisplayName = log.ReadText(() => s.DisplayName, language, What("DisplayName")),
                     ScreenNumber = log.Try(() => (int?)s.ScreenNumber, What("ScreenNumber")),
                     Width = log.Try(() => (long?)s.Width, What("Width")),
                     Height = log.Try(() => (long?)s.Height, What("Height")),

@@ -1,4 +1,5 @@
 using Siemens.Engineering;
+using TiaMcpServer.Contracts.Hmi;
 using TiaMcpServer.Contracts.Worker;
 using TiaMcpServer.OpennessWorker.Worker;
 
@@ -88,5 +89,45 @@ internal sealed class HmiReadLog
         }
 
         Fail(message);
+    }
+
+    /// <summary>The raw per-culture texts, or null (plus a message) when the property could not be read; a skipped item makes the result incomplete.</summary>
+    public List<HmiText>? ReadText(Func<MultilingualText?> read, string? language, string what)
+    {
+        MultilingualText? text;
+        try
+        {
+            text = read();
+        }
+        catch (EngineeringException ex)
+        {
+            Recover(ex, $"{what} could not be read: {ex.Message}");
+            return null;
+        }
+
+        var skipped = new List<string>();
+        var texts = HmiTextMapper.Map(text, language, skipped).ToList();
+        foreach (var message in skipped)
+        {
+            Fail(message);
+        }
+
+        return texts;
+    }
+
+    public HmiVariant? ReadVariant(Func<object?> read, string what)
+    {
+        object? value;
+        try
+        {
+            value = read();
+        }
+        catch (EngineeringException ex)
+        {
+            Recover(ex, $"{what} could not be read: {ex.Message}");
+            return null;
+        }
+
+        return HmiVariantMapper.Map(value);
     }
 }

@@ -175,6 +175,34 @@ public class HmiTagReaderTests
     }
 
     [Fact]
+    public void ListTags_SkippedCommentText_MarksIncomplete()
+    {
+        var tag = Tag("a");
+        tag.Comment.Items.Items.Add(new MultilingualTextItem { TextFailure = new EngineeringTargetInvocationException("text unavailable") });
+        var software = SoftwareWith(Table("T1", tag));
+
+        var info = HmiTagReader.ListTags(software, null, null, 0, 10);
+
+        Assert.False(info.IsComplete);
+        Assert.Contains("text unavailable", Assert.Single(info.Messages));
+    }
+
+    [Fact]
+    public void GetTag_MemberRowCap_StaysComplete()
+    {
+        var top = Tag("top");
+        for (var i = 0; i < 101; i++)
+        {
+            top.Members.Items.Add(Tag($"m{i:D3}"));
+        }
+
+        var info = HmiTagReader.GetTag(SoftwareWith(Table("T1", top)), "top", null);
+
+        Assert.True(info.IsComplete);
+        Assert.Contains("100", Assert.Single(info.Messages));
+    }
+
+    [Fact]
     public void UnreadableCommentIsNullNotEmptyAndMarksIncomplete()
     {
         var bad = Tag("b");
@@ -206,11 +234,11 @@ public class HmiTagReaderTests
     public void RowReadsEachPropertyOnceAndNeverTheConfirmationFamily()
     {
         var tag = Tag("a");
-        var messages = new List<string>();
+        var software = SoftwareWith(Table("T1", tag));
 
-        HmiTagReader.ReadRow(tag, null, messages);
+        var info = HmiTagReader.ListTags(software, null, null, 0, 10);
 
-        Assert.Empty(messages);
+        Assert.Empty(info.Messages);
         Assert.Equal(tag.Reads.Count, tag.Reads.Distinct().Count());
         Assert.DoesNotContain(tag.Reads, r => r is "ConfirmationType" or "GmpRelevant" or "MandatoryCommenting");
     }
