@@ -51,7 +51,7 @@ public class HmiSoftwareInfoReaderTests
     }
 
     [Fact]
-    public void RuntimeSettingsMissingSubObjectIsNullWithMessage()
+    public void ReadRuntimeSettings_ComfortKnownUnsupported_IsCompleteWithNote()
     {
         // S4: on a Comfort panel the reporting sub-object is null and GMPEnabled throws.
         var software = Unified("Panel_RT");
@@ -70,7 +70,7 @@ public class HmiSoftwareInfoReaderTests
         Assert.Null(info.Telemetry);
         Assert.Contains(info.Messages, m => m.Contains("HmiReportingSettings"));
         Assert.NotNull(info.UnifiedTags);
-        Assert.False(info.IsComplete); // GMPEnabled and TagOptimizationActive were unreadable
+        Assert.True(info.IsComplete); // GMPEnabled and TagOptimizationActive are known unsupported
         var general = info.General.Values.ToDictionary(v => v.Name, v => v.Value);
         Assert.Equal("Start", general["StartScreen"]);
         Assert.Equal("SR_1280X800", general["ScreenResolution"]);
@@ -79,6 +79,27 @@ public class HmiSoftwareInfoReaderTests
         Assert.Null(info.UnifiedTags!.Values.Single(v => v.Name == "TagOptimizationActive").Value);
         Assert.Equal(new[] { "en-US", "pl-PL" }, info.LanguageAndFonts.Select(l => l.Language));
         Assert.Equal(true, info.LanguageAndFonts[0].Enable);
+    }
+
+    [Fact]
+    public void ReadRuntimeSettings_UnknownPropertyThrows_IsIncomplete()
+    {
+        var software = Unified("Panel_RT");
+        software.RuntimeSettings.Failures["StartScreen"] = new EngineeringTargetInvocationException("nope");
+
+        var info = HmiSoftwareInfoReader.ReadRuntimeSettings(software);
+
+        Assert.False(info.IsComplete);
+        Assert.Contains(info.Messages, m => m.Contains("StartScreen"));
+    }
+
+    [Fact]
+    public void ReadRuntimeSettings_KnownPropertyNonRecoverableThrow_Propagates()
+    {
+        var software = Unified("Panel_RT");
+        software.RuntimeSettings.Failures["GMPEnabled"] = new EngineeringObjectDisposedException("TIA Portal has been disposed.");
+
+        Assert.Throws<WorkerOperationException>(() => HmiSoftwareInfoReader.ReadRuntimeSettings(software));
     }
 
     [Fact]

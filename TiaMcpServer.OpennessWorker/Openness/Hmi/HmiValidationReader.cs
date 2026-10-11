@@ -116,7 +116,7 @@ public static class HmiValidationReader
 
     private static List<(object Item, string Name)> Objects(HmiSoftware software, string category) => category switch
     {
-        "tags" => HmiTagReader.NamedTags(software).Concat(HmiTagReader.NamedSystemTags(software)).ToList(),
+        "tags" => HmiTagReader.NamedTags(software),
         "alarms" => HmiAlarmReader.NamedAlarms(software),
         "screens" => HmiScreenReader.NamedScreens(software),
         "connections" => HmiConnectionReader.NamedConnections(software),
@@ -124,7 +124,7 @@ public static class HmiValidationReader
         "alarmClasses" => HmiAlarmReader.NamedAlarmClasses(software),
         "all" => new[]
             {
-                HmiTagReader.NamedTags(software), HmiTagReader.NamedSystemTags(software),
+                HmiTagReader.NamedTags(software),
                 HmiAlarmReader.NamedAlarms(software), HmiAlarmReader.NamedAlarmClasses(software),
                 HmiConnectionReader.NamedConnections(software), HmiLogReader.NamedLogs(software),
                 HmiScreenReader.NamedScreens(software),

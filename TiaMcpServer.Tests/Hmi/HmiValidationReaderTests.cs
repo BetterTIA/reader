@@ -121,19 +121,19 @@ public class HmiValidationReaderTests
         }
     }
 
-    [Fact]
-    public void NonValidatableKindsListedOnce()
+    [Theory]
+    [InlineData("tags")]
+    [InlineData("all")]
+    public void Validate_ExcludesSystemTags(string category)
     {
         var software = Unified("Panel_RT");
-        software.Tags.Items.Add(Tag("t"));
-        software.SystemTags.Items.AddRange(new[] { new HmiSystemTag { Name = "@a" }, new HmiSystemTag { Name = "@b" } });
+        software.Tags.Items.AddRange(new[] { Tag("t1"), Tag("t2") });
+        software.SystemTags.Items.AddRange(new[] { new HmiSystemTag { Name = "@a" }, new HmiSystemTag { Name = "@b" }, new HmiSystemTag { Name = "@c" } });
 
-        var info = HmiValidationReader.Validate(software, "tags", null, 0, 100);
+        var info = HmiValidationReader.Validate(software, category, null, 0, 100);
 
-        Assert.Equal(3, info.Scanned);
-        Assert.Equal(1, info.Clean);
-        Assert.Empty(info.Findings);
-        Assert.Equal(new[] { "HmiSystemTag" }, info.NotValidatable);
+        Assert.Equal(2, info.Scanned);
+        Assert.DoesNotContain("HmiSystemTag", info.NotValidatable);
         Assert.True(info.IsComplete);
     }
 
