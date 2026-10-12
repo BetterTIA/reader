@@ -28,8 +28,9 @@ namespace Siemens.Engineering.HmiUnified.HmiTags
     public enum HmiSubstituteValueUsage { None, InvalidValue, RangeViolation, InvalidValueOrRangeViolation }
     public enum HmiLimitValueType { None, Constant, Tag }
     public enum HmiThresholdMode { None, Upper, Lower }
-    public abstract class HmiTag : global::Siemens.Engineering.IEngineeringObject, global::Siemens.Engineering.IEngineeringInstance, global::Siemens.Engineering.HmiUnified.Common.IValidator
+    public abstract class HmiTag : global::Siemens.Engineering.IEngineeringObject, global::Siemens.Engineering.IEngineeringInstance, global::Siemens.Engineering.HmiUnified.Common.IValidator, global::Siemens.Engineering.IEngineeringServiceProvider
     {
+        public T GetService<T>() where T : global::Siemens.Engineering.IEngineeringService => throw new global::System.NotSupportedException();
         public global::System.Collections.Generic.IList<global::Siemens.Engineering.HmiUnified.Common.HmiValidationResult> Validate() => throw new global::System.NotSupportedException();
         public global::Siemens.Engineering.MultilingualText Comment { get => throw new global::System.NotSupportedException(); }
         public global::Siemens.Engineering.HmiUnified.LoggingTags.HmiLoggingTagComposition LoggingTags { get => throw new global::System.NotSupportedException(); }
@@ -59,9 +60,11 @@ namespace Siemens.Engineering.HmiUnified.HmiTags
         void global::Siemens.Engineering.IEngineeringObject.SetAttribute(string name, object value) => throw new global::System.NotSupportedException();
         global::System.Collections.Generic.IList<global::Siemens.Engineering.EngineeringAttributeInfo> global::Siemens.Engineering.IEngineeringObject.GetAttributeInfos() => throw new global::System.NotSupportedException();
         global::Siemens.Engineering.IEngineeringObject global::Siemens.Engineering.IEngineeringInstance.Parent => throw new global::System.NotSupportedException();
+        T global::Siemens.Engineering.IEngineeringServiceProvider.GetService<T>() => throw new global::System.NotSupportedException();
     }
     public abstract class HmiTagComposition : global::Siemens.Engineering.IEngineeringComposition, global::Siemens.Engineering.IEngineeringInstance, global::System.Collections.Generic.IEnumerable<HmiTag>
     {
+        public HmiTag Find(string name) => throw new global::System.NotSupportedException();
         public global::System.Collections.Generic.IEnumerator<HmiTag> GetEnumerator() => throw new global::System.NotSupportedException();
         global::Siemens.Engineering.IEngineeringObject global::Siemens.Engineering.IEngineeringComposition.Create(global::System.Type type, global::System.Collections.Generic.IEnumerable<global::System.Collections.Generic.KeyValuePair<string, object>> parameters) => throw new global::System.NotSupportedException();
         global::Siemens.Engineering.IEngineeringObject global::Siemens.Engineering.IEngineeringInstance.Parent => throw new global::System.NotSupportedException();

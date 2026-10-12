@@ -97,7 +97,7 @@ internal sealed class ProjectTreeCursorCodec
         }
     }
 
-    private static bool IsValidHostBinding(ProjectBindingCursorState binding)
+    internal static bool IsValidHostBinding(ProjectBindingCursorState binding)
     {
         if (!binding.IsBound)
         {

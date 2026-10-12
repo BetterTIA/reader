@@ -109,28 +109,43 @@ Found while finishing [PR A](superpowers/plans/2026-10-05-plc-read-and-cross-ref
 - `read_cross_references`: legacy `referencedAsName` is kept beside `referencedAs` (it carries call-site text when `referencedAs` is null); decide whether to keep it.
 - The Plc protocol diagnostic duplicates Network's private `TryWriteProtocolDiagnostic` (missing `validators` field, 512 cap); share one helper.
 - `CrossReferenceTargetResolver.MatchOne` duplicates `ProjectTreeFilter.ResolveOne`'s predicate (drift is pinned by a round-trip test).
-- Unverified cross-reference owner kinds (spec Appendix B): technology objects and Unified `HmiTag` are verified but not shipped; TO instance DBs and Classic HMI tags were not present in the spike project.
+- Unverified cross-reference owner kinds (spec Appendix B): technology objects are verified but not shipped; TO instance DBs and Classic HMI tags were not present in the spike project. Unified `HmiTag` shipped on 2026-10-12 through the provisional `{hmi}` selector.
 
-## Open: hmi_read follow-ups (2026-10-08)
+## Open: hmi_read follow-ups (2026-10-12)
 
 Found while building and live-accepting [`hmi_read`](superpowers/specs/2026-10-07-hmi-read-design.md)
-([live acceptance report](superpowers/acceptance/reports/2026-10-08-hmi-read-live-acceptance.md)); none
-blocks it. Known limits are also listed in the
-[HMI operations summary](SupportedOperations/HMI_OPERATIONS_SUMMARY.md#known-limits).
+([live acceptance report](superpowers/acceptance/reports/2026-10-08-hmi-read-live-acceptance.md)) and
+its [completion track](superpowers/specs/2026-10-11-hmi-read-completion-design.md)
+([live acceptance report](superpowers/acceptance/reports/2026-10-12-hmi-read-completion-live-acceptance.md),
+observations O1-O6); none blocks it. Known limits are also listed in the
+[HMI operations summary](SupportedOperations/HMI_OPERATIONS_SUMMARY.md#known-limits). Items the
+completion track closed are under "hmi_read completion" at the end.
 
-- **PR B: Unified `HmiTag` owner kind in `read_cross_references`.** Needs an HMI selector;
-  `browse_project_tree` has no HMI nodes.
-- **Performance of whole-project scans.** About 21-23 s per call on a large PC station regardless of
-  `limit`; paging is stateless, so each page re-scans (1,286 faceplates = 13 calls of about 22 s each).
-  Consider cursors or caching.
-- **Non-integral values unverified live.** The project had only integral values. Encoding is now
-  explicit (`G15`/`G17`, `G7`/`G9`) and runtime-independent, so the offline test covers net48 too.
-- **Live evidence gaps.** Analog alarms, non-default connection drivers, tag comments, live validation
-  errors and warnings (finding shape covered offline only) and non-default Object values.
-- **Unread properties.** `GmpRelevant` and `MandatoryCommenting` are never read (unknown hazard, like
-  `ConfirmationType`, which crashed TIA Portal in the spike).
-- **`validate` scope.** Narrower than the spike's validatable set: member tags, logging tags and screen
-  items are excluded.
+- **Every item re-locates its HMI (O1).** Each `hmi_read` item resolves its HMI software again. On a
+  large project one `validate screenItems` item costs about 6 s, so 180 screens took 20.6 min. A
+  batch-level software cache would cut this.
+- **`get_tag` dotted-name hint (O2).** `get_tag` with a dotted UDT member name fails
+  `target_not_found` without the "UDT member paths are not supported" hint the `{hmi}`
+  cross-reference selector gives.
+- **`open_project` dry run misses an open project (O3, pre-existing).** A dry run while another project
+  is open in the same Portal reports no guard and `willCloseSource:false`; the actual call then fails
+  `worker_operation_failed` "Another project is already open."
+- **Slowdown and worker crash with a validation error in the project (O6, unexplained).** With a
+  broken tag binding in the project, every Openness call slowed sharply (one-screen `validate
+  screenItems` 172-189 s instead of about 6 s), and a 21-screen batch ended `worker_crashed` on its
+  second screen; run alone, that screen succeeded. Hypothesis (not established): an unfinished
+  background compile.
+- **Last page keeps its snapshot.** A cursor continuation that reaches the last page leaves its
+  snapshot in the worker store until LRU eviction or the 10-minute idle expiry, so it still takes one of
+  the 4 slots.
+- **Worker `{hmi}` resolver trusts the host.** `CrossReferenceTargetResolver` passes `hmiName` to
+  `HmiSoftwareLocator.FindUnique`, where null means "the only HMI"; the required, nonblank `hmiName`
+  is enforced only by host validation. Reject a null `hmiName` in the worker as well.
+- **Non-integral `Double` not observed live.** A tag's non-integral initial value arrives as
+  `System.String`; the explicit `G15`/`G17`, `G7`/`G9` encoding is still covered offline only.
+- **Live evidence gaps.** Non-default connection drivers (no OPC UA connection was available), live
+  validation warnings, non-default Object values, and a held object deleted between two pages
+  (covered offline by the snapshot store tests).
 - **Redaction coverage for unseen drivers.** The secret-name denylist (`password`, `passwd`,
   `passphrase`, `pwd`, `secret`, `token`, `credential`, `privatekey`) is inference, not observed: only
   S7-1200/1500 drivers were seen live. Check OPC UA and third-party drivers' property names and
@@ -138,20 +153,6 @@ blocks it. Known limits are also listed in the
 - **Portal exit after detach.** In spike run 2, TIA Portal exited about 4 s after the worker detached.
   The cause (a user close, or an exit on detach) was not determined and it was not reproduced; a
   possible crash-on-detach hazard to watch for.
-- **Duplicate reader helpers (final review M3).** `HmiTagReader` keeps its own `Guard` (identical to
-  `HmiReadLog.Guard`), `Variant` and `ReadComment`, duplicating `HmiAlarmReader.ReadVariant`/`ReadText`,
-  which `HmiScreenReader` borrows. Move `ReadText`/`ReadVariant` onto `HmiReadLog` and delete the copies.
-- **Two completeness idioms (final review M4).** The tag reader sets `isComplete` from
-  `Messages.Count == 0` while the other readers use `HmiReadLog.IsComplete`, and `HmiTextMapper.Map`
-  writes messages without flipping completeness. Route text reads through one `ReadText` that calls
-  `Fail` and use `HmiReadLog.IsComplete` everywhere.
-- **System tags fill the first `validate` tag pages (final review M8).** `@`-prefixed system tags sort
-  first and are counted in `scanned` as `notValidatable`. Order user tags first, or leave system tags out
-  of `scanned`.
-- **Comfort `get_runtime_settings` always incomplete (final review M9).** `GMPEnabled` and
-  `GeneralESIGCommentsStrategy` are documented as unsupported on Comfort panels yet mark every result
-  incomplete, hiding transient failures. Consider `HmiReadLog.Note` for spike-documented unsupported
-  properties.
 
 ## Open: plc_write follow-ups (PR B, 2026-10-07)
 
@@ -1215,3 +1216,32 @@ event classes are gone). The server picks the OB number from a shared table and 
 [report](superpowers/acceptance/reports/2026-10-09-ob-creation-live-acceptance.md) and the
 [spec](superpowers/specs/2026-10-08-ob-creation-design.md). Deferred items are under "Open:
 create_block OB follow-ups" above.
+
+## hmi_read completion — live-accepted 2026-10-12
+
+Closed the 2026-10-08 `hmi_read` follow-ups on `feature/hmi-read-completion`
+([spec](superpowers/specs/2026-10-11-hmi-read-completion-design.md),
+[plan](superpowers/plans/2026-10-11-hmi-read-completion.md),
+[live acceptance report](superpowers/acceptance/reports/2026-10-12-hmi-read-completion-live-acceptance.md),
+PASS with recorded limits). Contract version `1.1`; tool counts unchanged at 7/16/16.
+
+- **Whole-project scan cost.** Paged operations return an opt-in snapshot `page.nextCursor`; a
+  continuation reads only its page from a worker-held snapshot (4 snapshots, 10-minute idle lifetime).
+  Live: 1,286 faceplates took 21 s for the first page and 0.5-0.8 s per continuation.
+- **Unified `HmiTag` in `read_cross_references`.** Provisional `{hmi:{hmiName, tagName}}` selector for
+  top-level tags.
+- **`validate` scope.** New name-scoped categories `memberTags`, `loggingTags` and `screenItems`; a
+  real `Dynamization` finding on an IO field bound to a deleted tag was observed live.
+- **M3 and M4.** `ReadText`/`ReadVariant` live on `HmiReadLog`; every reader reports
+  `HmiReadLog.IsComplete`.
+- **M8.** `validate` no longer scans or counts `@` system tags.
+- **M9.** An allow-list (`GMPEnabled`, `GeneralESIGCommentsStrategy`, `TagOptimizationActive`) turns
+  "not supported" into a note; Comfort `get_runtime_settings` is complete.
+- **Classic-only locator.** With `hmiName` omitted and only Classic HMIs present, items fail
+  `target_kind_unsupported`.
+- **Live evidence gaps closed.** Analog alarms, tag comments in two languages, and live validation
+  errors. `GmpRelevant` and `MandatoryCommenting` are decided permanently unread.
+- **Deviation.** A worker restart between pages surfaces `binding_conflict` (binding invalidated), then
+  `cursor_binding_mismatch` after rebind, not the spec's `snapshot_unavailable`. Accepted.
+
+Remaining items are under "Open: hmi_read follow-ups (2026-10-12)" above.

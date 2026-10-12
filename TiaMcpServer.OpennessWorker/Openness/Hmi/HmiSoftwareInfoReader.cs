@@ -236,12 +236,36 @@ public static class HmiSoftwareInfoReader
             .ToList();
     }
 
+    /// <summary>Settings Openness reports as unsupported on Comfort panels; noted, not a read failure.</summary>
+    private static readonly ISet<string> KnownUnsupported = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "GMPEnabled", "GeneralESIGCommentsStrategy", "TagOptimizationActive",
+    };
+
     private static HmiRuntimeSectionInfo Section(HmiReadLog log, (string Name, Func<object?> Read)[] properties)
     {
         var section = new HmiRuntimeSectionInfo();
         foreach (var (name, read) in properties)
         {
-            section.Values.Add(new HmiSettingValue { Name = name, Value = Format(log.Try(read, $"Runtime setting '{name}'")) });
+            object? value = null;
+            try
+            {
+                value = read();
+            }
+            catch (EngineeringException ex)
+            {
+                var message = $"Runtime setting '{name}' could not be read: {ex.Message}";
+                if (KnownUnsupported.Contains(name) && HmiReadLog.IsRecoverable(ex))
+                {
+                    log.Note(message);
+                }
+                else
+                {
+                    log.Recover(ex, message);
+                }
+            }
+
+            section.Values.Add(new HmiSettingValue { Name = name, Value = Format(value) });
         }
 
         return section;

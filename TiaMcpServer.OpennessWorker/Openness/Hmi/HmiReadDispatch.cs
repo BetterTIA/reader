@@ -17,43 +17,42 @@ public static class HmiReadDispatch
             HmiTextMapper.RequireProjectLanguage(project, query.Language);
         }
 
+        // A continuation pages the held snapshot of its own software, so it skips the device walk.
+        var snapshot = query.SnapshotId is null ? null : HmiSnapshotStore.Shared.Take(project, query.SnapshotId, method);
+        var paging = new HmiPaging(query.Offset ?? 0, query.Limit ?? FallbackLimit, method, snapshot);
+        Siemens.Engineering.HmiUnified.HmiSoftware Software()
+            => snapshot?.Software ?? HmiSoftwareLocator.FindUnique(project, query.HmiName).Software;
+
         return method switch
         {
             "hmi_list_hmi_devices" => HmiSoftwareInfoReader.ListDevices(project),
-            "hmi_get_runtime_settings" => HmiSoftwareInfoReader.ReadRuntimeSettings(Software(project, query)),
-            "hmi_list_script_modules" => HmiSoftwareInfoReader.ListScriptModules(Software(project, query)),
-            "hmi_list_text_and_graphic_lists" => HmiSoftwareInfoReader.ListTextAndGraphicLists(Software(project, query)),
+            "hmi_get_runtime_settings" => HmiSoftwareInfoReader.ReadRuntimeSettings(Software()),
+            "hmi_list_script_modules" => HmiSoftwareInfoReader.ListScriptModules(Software()),
+            "hmi_list_text_and_graphic_lists" => HmiSoftwareInfoReader.ListTextAndGraphicLists(Software()),
             "hmi_list_project_languages" => HmiSoftwareInfoReader.ListProjectLanguages(project),
-            "hmi_list_tag_tables" => HmiTagReader.ListTagTables(Software(project, query), query.GroupPath),
-            "hmi_list_tags" => HmiTagReader.ListTags(
-                Software(project, query), query.TableName, query.Language, Offset(query), Limit(query)),
-            "hmi_get_tag" => HmiTagReader.GetTag(
-                Software(project, query), query.TagName ?? throw MissingField("tagName"), query.Language),
-            "hmi_list_system_tags" => HmiTagReader.ListSystemTags(Software(project, query), Offset(query), Limit(query)),
+            "hmi_list_tag_tables" => HmiTagReader.ListTagTables(Software(), query.GroupPath),
+            "hmi_list_tags" => HmiTagReader.ListTags(Software(), query.TableName, query.Language, paging, project),
+            "hmi_get_tag" => HmiTagReader.GetTag(Software(), query.TagName ?? throw MissingField("tagName"), query.Language),
+            "hmi_list_system_tags" => HmiTagReader.ListSystemTags(Software(), paging, project),
             "hmi_list_logging_tags" => HmiTagReader.ListLoggingTags(
-                Software(project, query), query.DataLogName, query.TagName, Offset(query), Limit(query)),
-            "hmi_list_connections" => HmiConnectionReader.ListConnections(Software(project, query)),
-            "hmi_list_alarms" => HmiAlarmReader.ListAlarms(
-                Software(project, query), query.AlarmKind, query.Language, Offset(query), Limit(query)),
+                Software(), query.DataLogName, query.TagName, paging, project),
+            "hmi_list_connections" => HmiConnectionReader.ListConnections(Software()),
+            "hmi_list_alarms" => HmiAlarmReader.ListAlarms(Software(), query.AlarmKind, query.Language, paging, project),
             "hmi_get_alarm" => HmiAlarmReader.GetAlarm(
-                Software(project, query),
+                Software(),
                 query.AlarmName ?? throw MissingField("alarmName"),
                 query.AlarmKind ?? throw MissingField("alarmKind"),
                 query.Language),
-            "hmi_list_alarm_classes" => HmiAlarmReader.ListAlarmClasses(Software(project, query)),
-            "hmi_list_logs" => HmiLogReader.ListLogs(Software(project, query)),
-            "hmi_list_screens" => HmiScreenReader.ListScreens(Software(project, query), query.GroupPath, query.Language),
+            "hmi_list_alarm_classes" => HmiAlarmReader.ListAlarmClasses(Software()),
+            "hmi_list_logs" => HmiLogReader.ListLogs(Software()),
+            "hmi_list_screens" => HmiScreenReader.ListScreens(Software(), query.GroupPath, query.Language),
             "hmi_list_screen_items" => HmiScreenReader.ListScreenItems(
-                Software(project, query), query.ScreenName ?? throw MissingField("screenName"), Offset(query), Limit(query)),
+                Software(), query.ScreenName ?? throw MissingField("screenName"), paging, project),
             "hmi_list_faceplate_instances" => HmiScreenReader.ListFaceplateInstances(
-                Software(project, query), query.ScreenName, Offset(query), Limit(query)),
-            "hmi_get_screen_navigation" => HmiScreenReader.GetScreenNavigation(Software(project, query)),
+                Software(), query.ScreenName, paging, project),
+            "hmi_get_screen_navigation" => HmiScreenReader.GetScreenNavigation(Software()),
             "hmi_validate" => HmiValidationReader.Validate(
-                Software(project, query),
-                query.Category ?? throw MissingField("category"),
-                query.Name,
-                Offset(query),
-                Limit(query)),
+                Software(), query.Category ?? throw MissingField("category"), query.Name, paging, project),
             _ => throw new WorkerOperationException(
                 WorkerFailureCategories.ValidationError, $"Unsupported HMI worker method '{method}'."),
         };
@@ -62,13 +61,6 @@ public static class HmiReadDispatch
     // The host always sends concrete paging values for paged operations (HmiOperationCatalog.DefaultLimit); these only guard a malformed request.
     private const int FallbackLimit = 100;
 
-    private static int Offset(HmiQueryInfo query) => query.Offset ?? 0;
-
-    private static int Limit(HmiQueryInfo query) => query.Limit ?? FallbackLimit;
-
     private static WorkerOperationException MissingField(string field)
         => new(WorkerFailureCategories.ValidationError, $"The '{field}' field is required.");
-
-    private static Siemens.Engineering.HmiUnified.HmiSoftware Software(ProjectBase project, HmiQueryInfo query)
-        => HmiSoftwareLocator.FindUnique(project, query.HmiName).Software;
 }

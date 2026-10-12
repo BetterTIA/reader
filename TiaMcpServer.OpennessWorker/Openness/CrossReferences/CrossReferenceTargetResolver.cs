@@ -1,5 +1,6 @@
 using Siemens.Engineering;
 using Siemens.Engineering.CrossReference;
+using Siemens.Engineering.HmiUnified.HmiTags;
 using Siemens.Engineering.HW;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
@@ -9,6 +10,7 @@ using Siemens.Engineering.SW.Units;
 using TiaMcpServer.Contracts.CrossReferences;
 using TiaMcpServer.Contracts.Project;
 using TiaMcpServer.Contracts.Worker;
+using TiaMcpServer.OpennessWorker.Openness.Hmi;
 using TiaMcpServer.OpennessWorker.Openness.Plc;
 using TiaMcpServer.OpennessWorker.Openness.Project;
 using TiaMcpServer.OpennessWorker.Worker;
@@ -49,6 +51,9 @@ public static class CrossReferenceTargetResolver
 {
     public static ResolvedCrossReferenceTarget Resolve(ProjectBase project, CrossReferenceSelectorInfo selector)
     {
+        if (selector?.Hmi is { } hmi)
+            return ResolveHmiTag(project, selector, hmi);
+
         var path = selector?.Path ?? throw Invalid("The cross-reference target needs a path.");
         Device device;
         try
@@ -85,6 +90,24 @@ public static class CrossReferenceTargetResolver
         return ProjectTreeNodeTypes.BlockLeaves.Contains(lastType) || lastType == ProjectTreeNodeTypes.Type
             ? Leaf(canonical, (IEngineeringServiceProvider)current)
             : new ResolvedCrossReferenceTarget(canonical, null, current);
+    }
+
+    // Provisional HMI tag selector (spec §5): the canonical identity echoes the caller's selector.
+    private static ResolvedCrossReferenceTarget ResolveHmiTag(ProjectBase project, CrossReferenceSelectorInfo selector, CrossReferenceHmiSelectorInfo hmi)
+    {
+        var software = HmiSoftwareLocator.FindUnique(project, hmi.HmiName).Software;
+        HmiTag tag;
+        try
+        {
+            tag = HmiTagLookup.FindUnique(software, hmi.TagName);
+        }
+        catch (WorkerOperationException ex) when (ex.FailureCategory == WorkerFailureCategories.TargetNotFound && hmi.TagName.IndexOf('.') >= 0)
+        {
+            throw new WorkerOperationException(WorkerFailureCategories.TargetNotFound,
+                $"Tag '{hmi.TagName}' was not found. UDT member paths are not supported in this version; name only the top-level tag.");
+        }
+
+        return Leaf(selector, tag);
     }
 
     private static ResolvedCrossReferenceTarget Leaf(CrossReferenceSelectorInfo canonical, IEngineeringServiceProvider owner)

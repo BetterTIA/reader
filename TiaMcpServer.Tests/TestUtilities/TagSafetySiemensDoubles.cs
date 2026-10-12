@@ -33,6 +33,7 @@ namespace Siemens.Engineering
         public List<T> Items { get; } = new();
         public Exception? EnumerationFailure { get; set; }
         public int YieldedItemCount { get; private set; }
+        public int Count => Items.Count;
         public T? Find(string name) => this.FirstOrDefault(x =>
             string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));
         public IEnumerator<T> GetEnumerator()

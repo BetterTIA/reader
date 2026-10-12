@@ -168,7 +168,10 @@ namespace Siemens.Engineering.HmiUnified.UI.Screens
         public uint Height { get => Get<uint>(); set => Set(value); }
     }
 
-    public sealed class HmiScreenComposition : Composition<HmiScreen> { }
+    public sealed class HmiScreenComposition : Composition<HmiScreen>
+    {
+        public new HmiScreen? Find(string name) => Items.FirstOrDefault(x => x.Name == name);
+    }
 }
 
 namespace Siemens.Engineering.HmiUnified.UI.ScreenGroup

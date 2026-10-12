@@ -23,10 +23,10 @@ public class CrossReferenceReadTools
         OpenWorld = false,
         UseStructuredContent = true,
         OutputSchemaType = typeof(ReadCrossReferencesResponse))]
-    [Description("Read cross-references of one project-tree target: a block, type, tag, constant, or a PLC, software unit or folder swept over every owner beneath it. Returns sources with their referenced objects and access locations; isComplete is false when an owner failed or the result was cut, with messages explaining why. An unsupported target kind is a typed failure, not an empty result.")]
+    [Description("Read cross-references of one project-tree target: a block, type, tag, constant, or a PLC, software unit or folder swept over every owner beneath it. Provisional: target { hmi: { hmiName, tagName } } instead of path reads one top-level WinCC Unified HMI tag (tags only, hmiName required; may be replaced by a unified HMI selector). Returns sources with their referenced objects and access locations; isComplete is false when an owner failed or the result was cut, with messages explaining why. An unsupported target kind is a typed failure, not an empty result.")]
     public static async Task<CallToolResult> ReadCrossReferences(
         OpennessWorkerClient workerClient,
-        [Description("The target: { path: [{ nodeType, name }, ...], member?: { kind, name } }. Copy path segments from browse_project_tree output.")] CrossReferenceTargetSelector target,
+        [Description("The target: { path: [{ nodeType, name }, ...], member?: { kind, name } } or, provisionally, { hmi: { hmiName, tagName } }, never both. Copy path segments from browse_project_tree output.")] CrossReferenceTargetSelector target,
         [Description("Optional filter: AllObjects, ObjectsWithReferences (default), ObjectsWithoutReferences, or UnusedObjects.")] string? filter = null,
         [Description("Optional cap on returned sources, 1 or greater. When cut, isComplete is false.")] int? maxResults = null,
         [Description("Optional .ap21 project or .amc21 local-session engineering path. If omitted, uses the project currently open in TIA Portal.")] string? projectPath = null)
@@ -49,8 +49,20 @@ public class CrossReferenceReadTools
 
     private static StructuredOperationFailure? Validate(CrossReferenceTargetSelector? target, string? filter, int? maxResults)
     {
-        if (target?.Path is null || target.Path.Count == 0)
-            return Fail(WorkerFailureCategories.InvalidSelector, "target.path must contain at least one segment.");
+        var hasPath = target?.Path is { Count: > 0 };
+        if (target?.Hmi is { } hmi)
+        {
+            if (hasPath || target.Member is not null)
+                return Fail(WorkerFailureCategories.ValidationError, "target takes either path (with optional member) or hmi, not both.");
+            if (string.IsNullOrWhiteSpace(hmi.HmiName))
+                return Fail(WorkerFailureCategories.ValidationError, "target.hmi.hmiName is required and must not be blank.");
+            if (string.IsNullOrWhiteSpace(hmi.TagName))
+                return Fail(WorkerFailureCategories.ValidationError, "target.hmi.tagName must not be blank.");
+            return ValidateOptions(filter, maxResults);
+        }
+
+        if (target?.Path is not { Count: > 0 })
+            return Fail(WorkerFailureCategories.ValidationError, "target needs either a non-empty path or hmi.");
         try
         {
             ProjectTreeNodeTypes.Validate(target.Path);
@@ -73,6 +85,11 @@ public class CrossReferenceReadTools
                     $"A {member.Kind} member needs target.path to end at a {ProjectTreeNodeTypes.TagTable} segment.");
         }
 
+        return ValidateOptions(filter, maxResults);
+    }
+
+    private static StructuredOperationFailure? ValidateOptions(string? filter, int? maxResults)
+    {
         if (!CrossReferenceFilterNames.TryNormalize(filter, out _, out var filterError))
             return Fail(WorkerFailureCategories.ValidationError, filterError!);
         if (maxResults < 1)

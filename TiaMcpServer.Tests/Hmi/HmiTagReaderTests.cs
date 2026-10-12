@@ -12,6 +12,7 @@ using static TiaMcpServer.Tests.Hmi.HmiTestProjects;
 
 namespace TiaMcpServer.Tests.Hmi;
 
+[Collection(HmiSnapshotStoreCollection.Name)]
 public class HmiTagReaderTests
 {
     private static HmiTag Tag(string name, string table = "T1", string dataType = "Int") => new()
@@ -105,12 +106,12 @@ public class HmiTagReaderTests
     {
         var software = SoftwareWith(Table("T1", Tag("c"), Tag("a")), Table("T2", Tag("b", "T2"), Tag("D", "T2")));
 
-        var first = HmiTagReader.ListTags(software, null, null, 0, 3);
-        var second = HmiTagReader.ListTags(software, null, null, 3, 3);
-        var past = HmiTagReader.ListTags(software, null, null, 10, 3);
+        var first = HmiTagReader.ListTags(software, null, null, Paged(0, 3), TestProject);
+        var second = HmiTagReader.ListTags(software, null, null, Paged(3, 3), TestProject);
+        var past = HmiTagReader.ListTags(software, null, null, Paged(10, 3), TestProject);
 
         Assert.Equal(new[] { "a", "b", "c" }, first.Tags.Select(t => t.Name));
-        Assert.Equal(new HmiPage(0, 3, 4, 3), first.Page);
+        Assert.Equal(new HmiPage(0, 3, 4, 3), first.Page with { SnapshotId = null });
         Assert.Equal(new[] { "D" }, second.Tags.Select(t => t.Name));
         Assert.Null(second.Page.NextOffset);
         Assert.Empty(past.Tags);
@@ -135,7 +136,7 @@ public class HmiTagReaderTests
     {
         var software = SoftwareWith(Table("T1", Tag("a")));
 
-        var row = Assert.Single(HmiTagReader.ListTags(software, null, "pl-PL", 0, 10).Tags);
+        var row = Assert.Single(HmiTagReader.ListTags(software, null, "pl-PL", Paged(0, 10), TestProject).Tags);
 
         Assert.Equal("k", Assert.Single(row.Comment).Text);
     }
@@ -148,12 +149,12 @@ public class HmiTagReaderTests
         software.TagTableGroups.Items.Add(group);
         software.Tags.Items.Add(group.TagTables.Items[0].Tags.Items[0]);
 
-        var inGroup = HmiTagReader.ListTags(software, "T2", null, 0, 10);
-        var root = HmiTagReader.ListTags(software, "t1", null, 0, 10);
+        var inGroup = HmiTagReader.ListTags(software, "T2", null, Paged(0, 10), TestProject);
+        var root = HmiTagReader.ListTags(software, "t1", null, Paged(0, 10), TestProject);
 
         Assert.Equal(new[] { "z" }, inGroup.Tags.Select(t => t.Name));
         Assert.Equal(new[] { "a" }, root.Tags.Select(t => t.Name));
-        var ex = Assert.Throws<WorkerOperationException>(() => HmiTagReader.ListTags(software, "nope", null, 0, 10));
+        var ex = Assert.Throws<WorkerOperationException>(() => HmiTagReader.ListTags(software, "nope", null, Paged(0, 10), TestProject));
         Assert.Equal(WorkerFailureCategories.TargetNotFound, ex.FailureCategory);
     }
 
@@ -164,7 +165,7 @@ public class HmiTagReaderTests
         bad.Failures["Connection"] = new EngineeringTargetInvocationException("no connection on this device");
         var software = SoftwareWith(Table("T1", Tag("a"), bad, Tag("c")));
 
-        var info = HmiTagReader.ListTags(software, null, null, 0, 10);
+        var info = HmiTagReader.ListTags(software, null, null, Paged(0, 10), TestProject);
 
         Assert.False(info.IsComplete);
         Assert.Equal(new[] { "a", "b", "c" }, info.Tags.Select(t => t.Name));
@@ -175,13 +176,41 @@ public class HmiTagReaderTests
     }
 
     [Fact]
+    public void ListTags_SkippedCommentText_MarksIncomplete()
+    {
+        var tag = Tag("a");
+        tag.Comment.Items.Items.Add(new MultilingualTextItem { TextFailure = new EngineeringTargetInvocationException("text unavailable") });
+        var software = SoftwareWith(Table("T1", tag));
+
+        var info = HmiTagReader.ListTags(software, null, null, Paged(0, 10), TestProject);
+
+        Assert.False(info.IsComplete);
+        Assert.Contains("text unavailable", Assert.Single(info.Messages));
+    }
+
+    [Fact]
+    public void GetTag_MemberRowCap_StaysComplete()
+    {
+        var top = Tag("top");
+        for (var i = 0; i < 101; i++)
+        {
+            top.Members.Items.Add(Tag($"m{i:D3}"));
+        }
+
+        var info = HmiTagReader.GetTag(SoftwareWith(Table("T1", top)), "top", null);
+
+        Assert.True(info.IsComplete);
+        Assert.Contains("100", Assert.Single(info.Messages));
+    }
+
+    [Fact]
     public void UnreadableCommentIsNullNotEmptyAndMarksIncomplete()
     {
         var bad = Tag("b");
         bad.Failures["Comment"] = new EngineeringTargetInvocationException("comment unavailable");
         var software = SoftwareWith(Table("T1", Tag("a"), bad));
 
-        var info = HmiTagReader.ListTags(software, null, "de-DE", 0, 10);
+        var info = HmiTagReader.ListTags(software, null, "de-DE", Paged(0, 10), TestProject);
 
         Assert.False(info.IsComplete);
         Assert.Contains("comment unavailable", Assert.Single(info.Messages));
@@ -197,7 +226,7 @@ public class HmiTagReaderTests
         bad.Failures["Address"] = new EngineeringObjectDisposedException("TIA Portal has been disposed.");
         var software = SoftwareWith(Table("T1", bad));
 
-        var ex = Assert.Throws<WorkerOperationException>(() => HmiTagReader.ListTags(software, null, null, 0, 10));
+        var ex = Assert.Throws<WorkerOperationException>(() => HmiTagReader.ListTags(software, null, null, Paged(0, 10), TestProject));
 
         Assert.Equal(WorkerFailureCategories.WorkerOperationFailed, ex.FailureCategory);
     }
@@ -206,11 +235,11 @@ public class HmiTagReaderTests
     public void RowReadsEachPropertyOnceAndNeverTheConfirmationFamily()
     {
         var tag = Tag("a");
-        var messages = new List<string>();
+        var software = SoftwareWith(Table("T1", tag));
 
-        HmiTagReader.ReadRow(tag, null, messages);
+        var info = HmiTagReader.ListTags(software, null, null, Paged(0, 10), TestProject);
 
-        Assert.Empty(messages);
+        Assert.Empty(info.Messages);
         Assert.Equal(tag.Reads.Count, tag.Reads.Distinct().Count());
         Assert.DoesNotContain(tag.Reads, r => r is "ConfirmationType" or "GmpRelevant" or "MandatoryCommenting");
     }
@@ -227,11 +256,31 @@ public class HmiTagReaderTests
     }
 
     [Fact]
+    public void GetTag_ExactName_UsesFind_NoEnumeration()
+    {
+        var software = SoftwareWith(Table("T1", Tag("Motor_1"), Tag("Motor_2")));
+
+        var info = HmiTagReader.GetTag(software, "Motor_2", null);
+
+        Assert.Equal("Motor_2", info.Tag.Name);
+        Assert.Equal(0, software.Tags.YieldedItemCount);
+    }
+
+    [Fact]
+    public void GetTag_CaseVariant_FallsBackToScan()
+    {
+        var software = SoftwareWith(Table("T1", Tag("motor_1")));
+
+        Assert.Null(software.Tags.Find("Motor_1"));
+        Assert.Equal("motor_1", HmiTagReader.GetTag(software, "Motor_1", null).Tag.Name);
+    }
+
+    [Fact]
     public void GetTagDuplicateNameIsTargetAmbiguous()
     {
-        var software = SoftwareWith(Table("T1", Tag("a")), Table("T2", Tag("A", "T2")));
+        var software = SoftwareWith(Table("T1", Tag("Ab")), Table("T2", Tag("AB", "T2")));
 
-        var ex = Assert.Throws<WorkerOperationException>(() => HmiTagReader.GetTag(software, "a", null));
+        var ex = Assert.Throws<WorkerOperationException>(() => HmiTagReader.GetTag(software, "aB", null));
 
         Assert.Equal(WorkerFailureCategories.TargetAmbiguous, ex.FailureCategory);
     }
@@ -369,8 +418,8 @@ public class HmiTagReaderTests
         var software = SoftwareWith(Table("T1", Tag("a")));
         software.DataLogs.Items.Add(new HmiDataLog { Name = "Log1" });
 
-        var known = HmiTagReader.ListLoggingTags(software, "log1", null, 0, 10);
-        var ex = Assert.Throws<WorkerOperationException>(() => HmiTagReader.ListLoggingTags(software, "Nope", null, 0, 10));
+        var known = HmiTagReader.ListLoggingTags(software, "log1", null, Paged(0, 10), TestProject);
+        var ex = Assert.Throws<WorkerOperationException>(() => HmiTagReader.ListLoggingTags(software, "Nope", null, Paged(0, 10), TestProject));
 
         Assert.Empty(known.LoggingTags);
         Assert.Equal(WorkerFailureCategories.TargetNotFound, ex.FailureCategory);
@@ -389,11 +438,11 @@ public class HmiTagReaderTests
         software.DataLogs.Items.Add(new HmiDataLog { Name = "Log1" });
         software.DataLogs.Items.Add(new HmiDataLog { Name = "Log2" });
 
-        var all = HmiTagReader.ListLoggingTags(software, null, null, 0, 10);
-        var byLog = HmiTagReader.ListLoggingTags(software, "LOG1", null, 0, 10);
-        var byTag = HmiTagReader.ListLoggingTags(software, null, "a", 0, 10);
-        var both = HmiTagReader.ListLoggingTags(software, "Log2", "a", 0, 10);
-        var paged = HmiTagReader.ListLoggingTags(software, null, null, 1, 1);
+        var all = HmiTagReader.ListLoggingTags(software, null, null, Paged(0, 10), TestProject);
+        var byLog = HmiTagReader.ListLoggingTags(software, "LOG1", null, Paged(0, 10), TestProject);
+        var byTag = HmiTagReader.ListLoggingTags(software, null, "a", Paged(0, 10), TestProject);
+        var both = HmiTagReader.ListLoggingTags(software, "Log2", "a", Paged(0, 10), TestProject);
+        var paged = HmiTagReader.ListLoggingTags(software, null, null, Paged(1, 1), TestProject);
 
         Assert.Equal(new[] { "a_l1", "a_l2", "b_l1" }, all.LoggingTags.Select(l => l.Name));
         Assert.Equal(3, all.Page.Total);
@@ -404,7 +453,7 @@ public class HmiTagReaderTests
         Assert.Equal(("a", "Log2", "Cyclic", "5 s", "RisingEdge"), (row.Tag, row.DataLog, row.LoggingMode, row.Cycle, row.TriggerMode));
         Assert.Equal("a_l2", Assert.Single(paged.LoggingTags).Name);
         Assert.Equal(2, paged.Page.NextOffset);
-        var ex = Assert.Throws<WorkerOperationException>(() => HmiTagReader.ListLoggingTags(software, null, "nope", 0, 10));
+        var ex = Assert.Throws<WorkerOperationException>(() => HmiTagReader.ListLoggingTags(software, null, "nope", Paged(0, 10), TestProject));
         Assert.Equal(WorkerFailureCategories.TargetNotFound, ex.FailureCategory);
     }
 
@@ -416,12 +465,12 @@ public class HmiTagReaderTests
         software.SystemTags.Items.Add(new HmiSystemTag { Name = "@Alpha", DataType = "Bool" });
         software.SystemTags.Items.Add(new HmiSystemTag { Name = "@Mid", DataType = "Real" });
 
-        var first = HmiTagReader.ListSystemTags(software, 0, 2);
-        var last = HmiTagReader.ListSystemTags(software, 2, 2);
+        var first = HmiTagReader.ListSystemTags(software, Paged(0, 2), TestProject);
+        var last = HmiTagReader.ListSystemTags(software, Paged(2, 2), TestProject);
 
         Assert.Equal(new[] { "@Alpha", "@Mid" }, first.SystemTags.Select(s => s.Name));
         Assert.Equal(new[] { "Bool", "Real" }, first.SystemTags.Select(s => s.DataType));
-        Assert.Equal(new HmiPage(0, 2, 3, 2), first.Page);
+        Assert.Equal(new HmiPage(0, 2, 3, 2), first.Page with { SnapshotId = null });
         Assert.Equal("@Zeta", Assert.Single(last.SystemTags).Name);
         Assert.Null(last.Page.NextOffset);
     }

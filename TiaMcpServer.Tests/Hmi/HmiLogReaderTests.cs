@@ -10,6 +10,7 @@ using static TiaMcpServer.Tests.Hmi.HmiTestProjects;
 
 namespace TiaMcpServer.Tests.Hmi;
 
+[Collection(HmiSnapshotStoreCollection.Name)]
 public class HmiLogReaderTests
 {
     private static readonly DateTime Start = new(2026, 3, 4, 5, 6, 7, DateTimeKind.Utc);

@@ -112,7 +112,11 @@ namespace Siemens.Engineering.HmiUnified.HmiTags
         public string TagTableName { get => Get<string>(); set => Set(value); }
     }
 
-    public sealed class HmiTagComposition : Composition<HmiTag> { }
+    public sealed class HmiTagComposition : Composition<HmiTag>
+    {
+        /// <summary>Exact-name lookup that, like Openness, does not enumerate.</summary>
+        public new HmiTag? Find(string name) => Items.FirstOrDefault(x => x.Name == name);
+    }
 
     public sealed class HmiTagTable : NamedObject
     {

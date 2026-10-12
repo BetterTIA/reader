@@ -9,6 +9,7 @@ using static TiaMcpServer.Tests.Hmi.HmiTestProjects;
 
 namespace TiaMcpServer.Tests.Hmi;
 
+[Collection(HmiSnapshotStoreCollection.Name)]
 public class HmiConnectionReaderTests
 {
     private const string Address = "Version=16.0.0.0;HostAddress=1.2.3.4;PlcAddress=1.2.3.5;";

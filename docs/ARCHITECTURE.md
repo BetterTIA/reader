@@ -560,6 +560,21 @@ pages over scanned objects. Properties known to be dangerous or sensitive are ne
 (`HmiTag.ConfirmationType`; connection driver properties with a credential-like name, whose values are
 never read; matching `InitialAddress` keys are dropped and the raw address is withheld).
 
+Paged operations continue through an opt-in snapshot cursor. Openness objects cannot leave the worker,
+so the snapshot lives there: `HmiSnapshotStore` holds the name-ordered objects of a scan that has more
+rows than its page (whether or not the caller uses a cursor), at most four snapshots, least recently used
+evicted first, each dropped after ten idle minutes. A continuation pages the held objects and reads only
+its own rows live; no device walk or composition enumeration runs. Invalidation is lazy: there is no
+clear on bind or detach, and `Take` fails `snapshot_unavailable` for an unknown id and
+`cursor_snapshot_mismatch` when the entry's project is not `object.Equals` to the current
+`ProjectBase` or the operation differs. A worker restart loses the store. The worker returns
+`page.snapshotId` only to the host; `HmiPayloadContract` removes it and, while more rows exist, seals
+`{snapshotId, operation, queryHash, offset, hostBinding}` into `page.nextCursor` with `HmiPageCursorCodec`,
+which mirrors `ProjectTreeCursorCodec` on the process-scoped `AuthenticatedCursorProtector`.
+`HmiWorkerInvoker` checks the cursor before any worker call (`invalid_cursor`,
+`cursor_filter_mismatch`, `cursor_binding_mismatch`). Unlike the project-tree store, the continuation
+still makes one worker call, because rows are read live.
+
 Compile-time types come from a third generated stub, `ref/Siemens.Engineering.WinCCUnified.dll`, built
 from `reference-stubs/Siemens.Engineering.WinCCUnified/` and verified with the other two by
 `scripts/verify-reference-stubs.ps1` (one shared source hash). Operation reference:

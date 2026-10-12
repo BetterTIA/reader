@@ -838,6 +838,38 @@ while ((line = Console.In.ReadLine()) is not null)
                 _ => $$"""{"success":false,"error":"unexpected hmi read method '{{ReadMethod(line)}}'"}"""
             });
             break;
+        case "hmi-read-paged":
+            // Five rows "1".."5"; snapshot "s1" is the only continuation the worker still holds.
+            if (ReadMethod(line) != "hmi_list_tags")
+            {
+                Respond("""{"success":false,"error":"unexpected hmi paged method"}""");
+            }
+            else if (ReadHmiQueryField(line, "snapshotId") is { } heldSnapshot && heldSnapshot != "s1")
+            {
+                Respond("""{"success":false,"failureCategory":"snapshot_unavailable","error":"snapshot not held"}""");
+            }
+            else
+            {
+                var pageOffset = ReadHmiQueryInt(line, "offset") ?? 0;
+                var pageLimit = ReadHmiQueryInt(line, "limit") ?? 2;
+                var pageEnd = Math.Min(pageOffset + pageLimit, 5);
+                var hasMore = pageEnd < 5;
+                var pagedList = new HmiTagListInfo
+                {
+                    Page = new HmiPage(pageOffset, pageLimit, 5, hasMore ? pageEnd : null)
+                    {
+                        SnapshotId = hasMore ? "s1" : null,
+                    },
+                };
+                for (var n = pageOffset + 1; n <= pageEnd; n++)
+                {
+                    pagedList.Tags.Add(new HmiTagRowInfo { Name = n.ToString() });
+                }
+
+                Respond(Success(ToCamelCaseJson(pagedList)));
+            }
+
+            break;
         case "plc-read-roundtrip":
             Respond(ReadMethod(line) switch
             {

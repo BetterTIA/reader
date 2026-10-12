@@ -22,11 +22,15 @@ public static class HmiAlarmReader
 
     private readonly record struct Entry(string Kind, AlarmBase Alarm, string Name);
 
-    public static HmiAlarmListInfo ListAlarms(HmiSoftware software, string? alarmKind, string? language, int offset, int limit)
+    public static HmiAlarmListInfo ListAlarms(
+        HmiSoftware software, string? alarmKind, string? language, HmiPaging paging, object project)
     {
-        var (items, page) = HmiPager.Page(Entries(software, alarmKind), e => e.Name, offset, limit);
+        var (items, page) = HmiPager.Page(() => Entries(software, alarmKind), e => e.Name, paging, project, software);
         var log = new HmiReadLog();
-        var rows = items.Select(e => ReadRow(e, language, log)).ToList();
+        var rows = items
+            .Where(e => log.IsLive(paging, e.Alarm, $"The {e.Kind} alarm '{e.Name}'"))
+            .Select(e => ReadRow(e, language, log))
+            .ToList();
         return new HmiAlarmListInfo { IsComplete = log.IsComplete, Messages = log.Messages, Page = page, Alarms = rows };
     }
 
@@ -64,7 +68,7 @@ public static class HmiAlarmReader
             () => alarm.EventText4, () => alarm.EventText5, () => alarm.EventText6,
             () => alarm.EventText7, () => alarm.EventText8, () => alarm.EventText9,
         };
-        var texts = eventTexts.Select((read, i) => ReadText(read, language, log, What($"EventText{i + 1}"))).ToList();
+        var texts = eventTexts.Select((read, i) => log.ReadText(read, language, What($"EventText{i + 1}"))).ToList();
 
         return new HmiAlarmDetailInfo
         {
@@ -158,8 +162,8 @@ public static class HmiAlarmReader
             AlarmClass = log.Try(() => alarm.AlarmClass, What("AlarmClass")),
             Priority = log.Try(() => (int?)alarm.Priority, What("Priority")),
             TriggerTag = log.Try(() => alarm.RaisedStateTag, What("RaisedStateTag")),
-            EventText = ReadText(() => alarm.EventText, language, log, What("EventText")),
-            InfoText = ReadText(() => alarm.InfoText, language, log, What("InfoText")),
+            EventText = log.ReadText(() => alarm.EventText, language, What("EventText")),
+            InfoText = log.ReadText(() => alarm.InfoText, language, What("InfoText")),
         };
 
         if (alarm is HmiDiscreteAlarm discrete)
@@ -174,7 +178,7 @@ public static class HmiAlarmReader
         else if (alarm is HmiAnalogAlarm analog)
         {
             row.Condition = log.Try(() => analog.Condition.ToString(), What("Condition"));
-            row.ConditionValue = ReadVariant(() => analog.ConditionValue, log, What("ConditionValue"));
+            row.ConditionValue = log.ReadVariant(() => analog.ConditionValue, What("ConditionValue"));
         }
 
         return row;
@@ -207,46 +211,6 @@ public static class HmiAlarmReader
             Connection = log.Try(() => type.Connection, What("Connection")),
             NodeId = log.Try(() => type.NodeId, What("NodeId")),
         };
-    }
-
-    /// <summary>The raw per-culture texts, or null (plus a message) when the property could not be read.</summary>
-    internal static List<HmiText>? ReadText(Func<MultilingualText?> read, string? language, HmiReadLog log, string what)
-    {
-        MultilingualText? text;
-        try
-        {
-            text = read();
-        }
-        catch (EngineeringException ex)
-        {
-            log.Recover(ex, $"{what} could not be read: {ex.Message}");
-            return null;
-        }
-
-        var skipped = new List<string>();
-        var texts = HmiTextMapper.Map(text, language, skipped).ToList();
-        foreach (var message in skipped)
-        {
-            log.Fail(message);
-        }
-
-        return texts;
-    }
-
-    internal static HmiVariant? ReadVariant(Func<object?> read, HmiReadLog log, string what)
-    {
-        object? value;
-        try
-        {
-            value = read();
-        }
-        catch (EngineeringException ex)
-        {
-            log.Recover(ex, $"{what} could not be read: {ex.Message}");
-            return null;
-        }
-
-        return HmiVariantMapper.Map(value);
     }
 
     /// <summary>The parameter-tag names in order; any other runtime shape, or a read failure, is null plus a message.</summary>

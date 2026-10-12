@@ -16,28 +16,45 @@ namespace TiaMcpServer.OpennessWorker.Openness.Hmi;
 /// </summary>
 public static class HmiValidationReader
 {
-    public static HmiValidationInfo Validate(HmiSoftware software, string category, string? name, int offset, int limit)
+    public static HmiValidationInfo Validate(
+        HmiSoftware software, string category, string? name, HmiPaging paging, object project)
     {
-        var scanned = Objects(software, category);
-        if (name is not null)
+        List<(object Item, string Name)> Scan()
         {
-            scanned = scanned.Where(o => string.Equals(o.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
-            if (scanned.Count == 0)
+            if (NameScoped.Contains(category))
             {
-                throw new WorkerOperationException(
-                    WorkerFailureCategories.TargetNotFound,
-                    $"No '{category}' object named '{name}' was found. Use the list operations to see the objects.");
+                // The name selects the owning tag or screen, not an object of the category.
+                return ScopedObjects(software, category, name);
             }
+
+            var scanned = Objects(software, category);
+            if (name is not null)
+            {
+                scanned = scanned.Where(o => string.Equals(o.Name, name, StringComparison.OrdinalIgnoreCase)).ToList();
+                if (scanned.Count == 0)
+                {
+                    throw new WorkerOperationException(
+                        WorkerFailureCategories.TargetNotFound,
+                        $"No '{category}' object named '{name}' was found. Use the list operations to see the objects.");
+                }
+            }
+
+            return scanned;
         }
 
         var (items, page) = HmiPager.Page(
-            scanned, o => category == "all" ? KindOf(o.Item) + "\0" + o.Name : o.Name, offset, limit);
+            Scan, o => category == "all" ? KindOf(o.Item) + "\0" + o.Name : o.Name, paging, project, software);
         var info = new HmiValidationInfo { Page = page, Scanned = items.Count };
         var log = new HmiReadLog();
         var notValidatable = new SortedSet<string>(StringComparer.Ordinal);
         foreach (var (item, itemName) in items)
         {
             var kind = KindOf(item);
+            if (!log.IsLive(paging, item, $"{kind} '{itemName}'"))
+            {
+                continue;
+            }
+
             if (item is not IValidator validator)
             {
                 notValidatable.Add(kind);
@@ -112,11 +129,32 @@ public static class HmiValidationReader
 
         return results;
     }
+
     private static string KindOf(object item) => item.GetType().Name;
+
+    private static readonly HashSet<string> NameScoped = new(StringComparer.Ordinal) { "memberTags", "loggingTags", "screenItems" };
+
+    private static List<(object Item, string Name)> ScopedObjects(HmiSoftware software, string category, string? name)
+    {
+        if (name is null)
+        {
+            throw new WorkerOperationException(
+                WorkerFailureCategories.ValidationError, $"Category '{category}' requires a name.");
+        }
+
+        if (category == "screenItems")
+        {
+            return HmiScreenReader.NamedScreenItems(software, name);
+        }
+
+        var tag = HmiTagLookup.FindUnique(software, name);
+        var tagName = HmiReadLog.Guard(() => tag.Name, "A tag name");
+        return (category == "memberTags" ? HmiTagReader.MemberObjects(tag, tagName) : HmiTagReader.LoggingTagObjects(tag, tagName)).ToList();
+    }
 
     private static List<(object Item, string Name)> Objects(HmiSoftware software, string category) => category switch
     {
-        "tags" => HmiTagReader.NamedTags(software).Concat(HmiTagReader.NamedSystemTags(software)).ToList(),
+        "tags" => HmiTagReader.NamedTags(software),
         "alarms" => HmiAlarmReader.NamedAlarms(software),
         "screens" => HmiScreenReader.NamedScreens(software),
         "connections" => HmiConnectionReader.NamedConnections(software),
@@ -124,7 +162,7 @@ public static class HmiValidationReader
         "alarmClasses" => HmiAlarmReader.NamedAlarmClasses(software),
         "all" => new[]
             {
-                HmiTagReader.NamedTags(software), HmiTagReader.NamedSystemTags(software),
+                HmiTagReader.NamedTags(software),
                 HmiAlarmReader.NamedAlarms(software), HmiAlarmReader.NamedAlarmClasses(software),
                 HmiConnectionReader.NamedConnections(software), HmiLogReader.NamedLogs(software),
                 HmiScreenReader.NamedScreens(software),

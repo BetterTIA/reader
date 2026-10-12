@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 using TiaMcpServer.Cli;
 using TiaMcpServer.Cli.Install;
 using TiaMcpServer.Cursors;
+using TiaMcpServer.Hmi;
 using TiaMcpServer.Network;
 using TiaMcpServer.ProjectTree;
 using TiaMcpServer.ProjectLifecycle;
@@ -88,6 +89,8 @@ namespace TiaMcpServer
                 sp.GetRequiredService<HardwarePageCursorCodec>(),
                 sp.GetRequiredService<HardwarePageProjector>()));
             builder.Services.AddSingleton(sp => new ProjectTreeCursorCodec(
+                sp.GetRequiredService<AuthenticatedCursorProtector>()));
+            builder.Services.AddSingleton(sp => new HmiPageCursorCodec(
                 sp.GetRequiredService<AuthenticatedCursorProtector>()));
             builder.Services.AddSingleton(sp => new ProjectTreeSnapshotStore(TimeProvider.System));
             builder.Services.AddSingleton(sp => new ProjectTreePageProjector(

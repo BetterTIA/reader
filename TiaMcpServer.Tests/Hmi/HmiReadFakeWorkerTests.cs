@@ -38,7 +38,7 @@ public class HmiReadFakeWorkerTests
         using var uiOpen = FakeWorkerUiOpenProject.ForWorkerRelativePath(Scenario);
         using var client = CreateClient();
 
-        var result = await HmiReadTools.HmiRead(client, new[]
+        var result = await HmiReadTools.HmiRead(client, new HmiPageCursorCodec(TiaMcpServer.Cursors.AuthenticatedCursorProtector.CreateProcessScoped()), new[]
         {
             Op("devices", "list_hmi_devices"),
             Op("tags", "list_tags", r => r.HmiName = "HMI_1"),
@@ -68,7 +68,7 @@ public class HmiReadFakeWorkerTests
             using var uiOpen = FakeWorkerUiOpenProject.ForWorkerRelativePath(Scenario);
             using var client = CreateClient();
 
-            var result = await HmiReadTools.HmiRead(client, new[]
+            var result = await HmiReadTools.HmiRead(client, new HmiPageCursorCodec(TiaMcpServer.Cursors.AuthenticatedCursorProtector.CreateProcessScoped()), new[]
             {
                 Op("tags", "list_tags", r => { r.HmiName = "HMI_1"; r.TableName = "Motors"; r.Offset = 5; r.Limit = 7; }),
             });
@@ -84,13 +84,67 @@ public class HmiReadFakeWorkerTests
         }
     }
 
+    private const string PagedScenario = "hmi-read-paged";
+
+    private static HmiOperationRequest PagedOp(string? cursor = null)
+        => new()
+        {
+            OperationId = "tags", Operation = "list_tags", ProjectPath = PagedScenario,
+            HmiName = "HMI_1", Limit = 2, Cursor = cursor,
+        };
+
+    private static async Task<JsonElement> PageAsync(
+        OpennessWorkerClient client, HmiPageCursorCodec codec, string? cursor = null)
+    {
+        var result = await HmiReadTools.HmiRead(client, codec, new[] { PagedOp(cursor) });
+        return Items(result)[0];
+    }
+
+    private static string[] Names(JsonElement item)
+        => item.GetProperty("result").GetProperty("tags").EnumerateArray()
+            .Select(t => t.GetProperty("name").GetString()!).ToArray();
+
+    [Fact]
+    public async Task Paged_FirstContinuationLast_FollowsCursor()
+    {
+        using var uiOpen = FakeWorkerUiOpenProject.ForWorkerRelativePath(PagedScenario);
+        using var client = CreateClient();
+        var codec = new HmiPageCursorCodec(TiaMcpServer.Cursors.AuthenticatedCursorProtector.CreateProcessScoped());
+
+        var first = await PageAsync(client, codec);
+        var second = await PageAsync(client, codec, first.GetProperty("result").GetProperty("page").GetProperty("nextCursor").GetString());
+        var last = await PageAsync(client, codec, second.GetProperty("result").GetProperty("page").GetProperty("nextCursor").GetString());
+
+        Assert.Equal(new[] { "1", "2" }, Names(first));
+        Assert.Equal(new[] { "3", "4" }, Names(second));
+        Assert.Equal(new[] { "5" }, Names(last));
+        Assert.False(last.GetProperty("result").GetProperty("page").TryGetProperty("nextCursor", out _));
+    }
+
+    [Fact]
+    public async Task Paged_UnknownSnapshot_IsSnapshotUnavailable()
+    {
+        using var uiOpen = FakeWorkerUiOpenProject.ForWorkerRelativePath(PagedScenario);
+        using var client = CreateClient();
+        var codec = new HmiPageCursorCodec(TiaMcpServer.Cursors.AuthenticatedCursorProtector.CreateProcessScoped());
+
+        var first = await PageAsync(client, codec);
+        var issued = codec.Decode(first.GetProperty("result").GetProperty("page").GetProperty("nextCursor").GetString()!);
+        var unknown = codec.Encode(issued with { SnapshotId = "s2" });
+
+        var item = await PageAsync(client, codec, unknown);
+
+        Assert.Equal("failed", item.GetProperty("status").GetString());
+        Assert.Equal("snapshot_unavailable", item.GetProperty("failure").GetProperty("category").GetString());
+    }
+
     [Fact]
     public async Task ProtocolMismatchPayloadIsProtocolError()
     {
         using var uiOpen = FakeWorkerUiOpenProject.ForWorkerRelativePath(Scenario);
         using var client = CreateClient();
 
-        var result = await HmiReadTools.HmiRead(client, new[] { Op("sys", "list_system_tags", r => r.HmiName = "HMI_1") });
+        var result = await HmiReadTools.HmiRead(client, new HmiPageCursorCodec(TiaMcpServer.Cursors.AuthenticatedCursorProtector.CreateProcessScoped()), new[] { Op("sys", "list_system_tags", r => r.HmiName = "HMI_1") });
 
         var item = Items(result)[0];
         Assert.Equal("failed", item.GetProperty("status").GetString());

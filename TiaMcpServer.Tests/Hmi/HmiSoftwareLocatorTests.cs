@@ -11,14 +11,35 @@ namespace TiaMcpServer.Tests.Hmi;
 public class HmiSoftwareLocatorTests
 {
     [Fact]
-    public void NoUnifiedHmiIsTargetNotFoundNamingListHmiDevices()
+    public void FindUnique_NoName_NoHmiAtAll_IsTargetNotFound()
     {
-        var project = ProjectWith(DeviceWith("Panel", Classic("Classic_RT")));
+        var project = ProjectWith();
 
         var ex = Assert.Throws<WorkerOperationException>(() => HmiSoftwareLocator.FindUnique(project, null));
 
         Assert.Equal(WorkerFailureCategories.TargetNotFound, ex.FailureCategory);
         Assert.Contains("list_hmi_devices", ex.Message);
+    }
+
+    [Fact]
+    public void FindUnique_NoName_OnlyClassic_IsTargetKindUnsupported()
+    {
+        var project = ProjectWith(DeviceWith("Panel", Classic("Classic_RT")));
+
+        var ex = Assert.Throws<WorkerOperationException>(() => HmiSoftwareLocator.FindUnique(project, null));
+
+        Assert.Equal(WorkerFailureCategories.TargetKindUnsupported, ex.FailureCategory);
+    }
+
+    [Fact]
+    public void FindUnique_ClassicMessage_DoesNotNameTool()
+    {
+        var project = ProjectWith(DeviceWith("Panel", Classic("Classic_RT")));
+
+        var ex = Assert.Throws<WorkerOperationException>(() => HmiSoftwareLocator.FindUnique(project, null));
+
+        Assert.DoesNotContain("hmi_read", ex.Message);
+        Assert.Contains("WinCC Unified", ex.Message);
     }
 
     [Fact]

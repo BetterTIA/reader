@@ -54,7 +54,8 @@ public class McpToolSchemaTests
         var execution = new WriteExecution(new OpennessWriteBindingGate(workerClient),
             new JsonlWriteAuditSink(Path.Combine(Path.GetTempPath(), "tia-schema-" + Guid.NewGuid().ToString("N"))),
             LifecycleWriteDomain.Catalog, TimeProvider.System);
-        return new FakeServiceProvider(binding, workerClient, coordinator, execution);
+        return new FakeServiceProvider(binding, workerClient, coordinator, execution,
+            new TiaMcpServer.Hmi.HmiPageCursorCodec(protector));
     }
 
     private static string[] SchemaPropertyNames(Type toolType, string methodName)

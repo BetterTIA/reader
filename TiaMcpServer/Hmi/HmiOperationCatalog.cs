@@ -47,7 +47,7 @@ public static class HmiOperationCatalog
         ["validate"] = Op(new[] { "category" }, new[] { "hmiName", "name" }, paged: true),
     };
 
-    private static readonly string[] PagingFields = { "offset", "limit" };
+    private static readonly string[] PagingFields = { "offset", "limit", "cursor" };
 
     private static readonly IReadOnlySet<string> AlarmKinds = new HashSet<string>(StringComparer.Ordinal)
     {
@@ -57,6 +57,12 @@ public static class HmiOperationCatalog
     private static readonly IReadOnlySet<string> Categories = new HashSet<string>(StringComparer.Ordinal)
     {
         "tags", "alarms", "screens", "connections", "logs", "alarmClasses", "all",
+        "memberTags", "loggingTags", "screenItems",
+    };
+
+    private static readonly IReadOnlySet<string> NameRequiredCategories = new HashSet<string>(StringComparer.Ordinal)
+    {
+        "memberTags", "loggingTags", "screenItems",
     };
 
     private static readonly (string Name, Func<HmiOperationRequest, bool> IsSet)[] OperationFields =
@@ -65,6 +71,7 @@ public static class HmiOperationCatalog
         ("language", op => op.Language is not null),
         ("offset", op => op.Offset is not null),
         ("limit", op => op.Limit is not null),
+        ("cursor", op => op.Cursor is not null),
         ("groupPath", op => op.GroupPath is not null),
         ("tableName", op => op.TableName is not null),
         ("tagName", op => op.TagName is not null),
@@ -256,6 +263,11 @@ public static class HmiOperationCatalog
             errors.Add($"{prefix}: 'offset' must be 0 or greater.");
         }
 
+        if (operation.Cursor is not null && operation.Offset is not null)
+        {
+            errors.Add($"{prefix}: 'cursor' is not valid with 'offset'; the cursor carries the position.");
+        }
+
         if (operation.Language is not null && !IsValidCulture(operation.Language))
         {
             errors.Add($"{prefix}: 'language' must be a culture name such as en-US.");
@@ -273,6 +285,11 @@ public static class HmiOperationCatalog
         else if (operation.Name is not null && operation.Category == "all")
         {
             errors.Add($"{prefix}: 'name' is not valid with category all.");
+        }
+
+        if (operation.Category is { } named && NameRequiredCategories.Contains(named) && string.IsNullOrWhiteSpace(operation.Name))
+        {
+            errors.Add($"{prefix}: 'name' is required for category {named}.");
         }
 
         if (operation.GroupPath is not null && operation.GroupPath.Split('/').Any(string.IsNullOrWhiteSpace))
