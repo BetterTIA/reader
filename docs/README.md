@@ -19,7 +19,8 @@ For the project overview, tool list, and quick start, see the [README](../README
 | Document | What you will find |
 | --- | --- |
 | [Architecture](ARCHITECTURE.md) | Two-process topology, tier enforcement, explicit binding/cursor invalidation, transport, canonical JSON, mode-derived confirmation/audit v2, and testing |
-| [HMI operations (`hmi_read`)](SupportedOperations/HMI_OPERATIONS_SUMMARY.md) | The 20 read-only WinCC Unified operations, paging and completeness rules, `validate` scope, redaction, known limits and out-of-scope areas |
+| [HMI operations (`hmi_read`)](SupportedOperations/HMI_OPERATIONS_SUMMARY.md) | The 20 read-only WinCC Unified operations, offset and cursor paging, completeness rules, `validate` categories, redaction, known limits and out-of-scope areas |
+| [hmi_read completion live acceptance](superpowers/acceptance/reports/2026-10-12-hmi-read-completion-live-acceptance.md) | Cursor paging and its failure categories, name-scoped `validate` categories, the provisional `{hmi}` cross-reference selector, runtime-settings allow-list, local-session paging, the 42-row regression, and observations O1-O6 |
 | [Multiuser local sessions, inventory and acceptance boundary](SupportedOperations/MULTIUSER_OPERATIONS_SUMMARY.md) | Exact AMC adoption, ALS opening/basic status, persistent inventory, preservation guards and remaining session limits |
 | [OB creation live acceptance (issue #75)](superpowers/acceptance/reports/2026-10-09-ob-creation-live-acceptance.md) | All 15 `obEventClass` values on an S7-1500 with planned equal to actual numbers, duplicate singleton blocked in `dryRun` and actual, S7-1200 refusal text, STL FB/FC/OB, clean full compile apart from the HardwareInterrupt trigger warning |
 | [OB creation Phase 0 spike (issue #75)](superpowers/acceptance/reports/2026-10-08-ob-creation-spike.md) | SimaticML import under the SimaticSD default, number and duplicate-singleton behavior, STL `SetENOAutomatically` rejection, S7-1200 and S7-1200 G2 class support |
@@ -65,7 +66,9 @@ records implemented/offline-qualified `.amc21` adoption and `.als21` opening, wi
 maintainer acceptance on October 8. The report retains failed noninteractive offline opening
 and unexecuted matrix rows; Issue #65 and successor session operations remain open.
 
-Latest process entry: the [`create_block` OB creation design](superpowers/specs/2026-10-08-ob-creation-design.md) (issue #75), its [Phase 0 spike report](superpowers/acceptance/reports/2026-10-08-ob-creation-spike.md), its [implementation plan](superpowers/plans/2026-10-08-ob-creation.md) and its [installed-tool live acceptance report](superpowers/acceptance/reports/2026-10-09-ob-creation-live-acceptance.md).
+Latest process entry: the [hmi_read completion design](superpowers/specs/2026-10-11-hmi-read-completion-design.md), its [implementation plan](superpowers/plans/2026-10-11-hmi-read-completion.md) and its [installed-tool live acceptance report](superpowers/acceptance/reports/2026-10-12-hmi-read-completion-live-acceptance.md).
+
+Previous process entries: the [`create_block` OB creation design](superpowers/specs/2026-10-08-ob-creation-design.md) (issue #75), its [Phase 0 spike report](superpowers/acceptance/reports/2026-10-08-ob-creation-spike.md), its [implementation plan](superpowers/plans/2026-10-08-ob-creation.md) and its [installed-tool live acceptance report](superpowers/acceptance/reports/2026-10-09-ob-creation-live-acceptance.md).
 
 Previous process entries: the [hmi_read design](superpowers/specs/2026-10-07-hmi-read-design.md) (with its dated post-implementation corrections), its [spike report](superpowers/acceptance/reports/2026-10-07-hmi-read-spike.md) and its [installed-tool live acceptance report](superpowers/acceptance/reports/2026-10-08-hmi-read-live-acceptance.md).
 

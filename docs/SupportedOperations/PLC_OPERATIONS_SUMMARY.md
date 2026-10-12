@@ -102,6 +102,16 @@ only in case are `target_ambiguous`). `member` addresses leaves the tree does no
 and `maxResults` (1 or greater) are validated before any worker call; `projectPath` is a target
 constraint only.
 
+Provisionally, `target` may instead be `{ hmi: { hmiName, tagName } }` for one top-level WinCC
+Unified HMI tag; it may be replaced by a unified HMI selector once alarms or screens need
+cross-references. `hmiName` is required (software or device name, case-insensitive) and `tagName`
+matches case-insensitively. A dotted UDT member name (`Motor_1.Speed`) fails `target_not_found` with
+the guidance to name only the top-level tag; an ambiguous HMI is `target_ambiguous` and a Classic
+HMI `target_kind_unsupported`. A target carries either a non-empty `path` (with optional `member`) or
+`hmi`: both, neither (including an empty `path` without `hmi`) or a blank `hmiName`/`tagName` is
+`validation_error`. Filters, `maxResults`, budgets and the result shape are unchanged, and the
+target echo repeats the `hmi` selector.
+
 - A path ending at a leaf (an OB, FB, FC, GlobalDB, InstanceDB or ArrayDB block, a system block, or a
   PLC type) or any `member` is one query on that object.
 - A path ending at a container (`Device`, `PlcSoftware`, `SoftwareUnit`, a block, system-block,
@@ -129,9 +139,11 @@ with one message counting what was omitted; the omitted tail cannot be paged.
 
 ### Unverified owner kinds
 
-Only kinds whose owners were verified live (2026-10-05, V21) ship as members or endpoints. Not
-shipped, and unverified for this tool: technology objects and WinCC Unified `HmiTag` (the
-cross-reference service works, but the project tree has no node type for them), `DeviceItem`,
+Only kinds whose owners were verified live (2026-10-05, V21) ship as members or endpoints. WinCC
+Unified `HmiTag` ships through the provisional `hmi` selector above (live 2026-10-12, see the
+[completion report](../superpowers/acceptance/reports/2026-10-12-hmi-read-completion-live-acceptance.md)).
+Not shipped, and unverified for this tool: technology objects (the cross-reference service works,
+but the project tree has no node type for them), `DeviceItem`,
 `Subnet` and `Node` (no service observed), technology-object instance DBs and WinCC Classic HMI tags
 (not present in the spike project). `Device`, `PlcSoftware`, `SoftwareUnit` and `TagTable` are not
 owners themselves; they only enumerate the owners beneath them. See Appendix B of the

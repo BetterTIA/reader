@@ -151,6 +151,10 @@ outdated-object state, and they do not establish Project Server connectivity. Th
 [PR5 live report](../superpowers/acceptance/reports/2026-10-09-multiuser-pr5-live-verification.md)
 records one cold-adopted local session (reported mode and connection `unknown`) and a standalone
 regression; deliberately Exclusive and offline sessions were not exercised. The
+[hmi_read completion report](../superpowers/acceptance/reports/2026-10-12-hmi-read-completion-live-acceptance.md)
+adds `hmi_read` cursor paging on a cold-adopted local session: continuations reused the worker
+snapshot across calls. The provisional `read_cross_references` `{hmi}` selector was verified on
+standalone projects only. The
 [PR6 live report](../superpowers/acceptance/reports/2026-10-09-multiuser-pr6-live-verification.md)
 records every write, compile and save path on cold-adopted Multiuser and Exclusive sessions in
 `full` mode. Read-write confirmation, worker-opened and offline sessions were not exercised.

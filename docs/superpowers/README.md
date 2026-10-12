@@ -21,6 +21,7 @@ Design documents, written before implementation.
 
 | Date | Document |
 | --- | --- |
+| 2026-10-11 | [`hmi_read` completion — opt-in snapshot cursor, provisional `{hmi}` cross-reference selector, name-scoped `validate` categories, review cleanups (implemented; live-accepted)](specs/2026-10-11-hmi-read-completion-design.md) |
 | 2026-10-08 | [`create_block` OB creation, issue #75 (implemented; live-accepted)](specs/2026-10-08-ob-creation-design.md) |
 | 2026-10-05 | [PLC read/write tools and standalone cross-references (approved; PR A and PR B implemented and live-accepted)](specs/2026-10-05-plc-read-write-and-cross-references-design.md) |
 | 2026-10-04 | [Network discovery and interface-qualified node identity repair (implemented; full live acceptance pending)](specs/2026-10-04-network-discovery-and-interface-node-identity-repair-design.md) |
@@ -53,6 +54,7 @@ Task-level implementation plans derived from the specs above.
 
 | Date | Document |
 | --- | --- |
+| 2026-10-11 | [`hmi_read` completion (implemented; live-accepted)](plans/2026-10-11-hmi-read-completion.md) |
 | 2026-10-08 | [`create_block` OB creation, issue #75 (implemented; live-accepted)](plans/2026-10-08-ob-creation.md) |
 | 2026-10-07 | [Multiuser PR4 — open existing sessions (implemented/offline-qualified; scoped maintainer live acceptance)](plans/2026-10-07-multiuser-pr4-open-existing-sessions.md) |
 | 2026-10-05 | [Multiuser PR 3 — inventory through bind_project (offline-qualified; live acceptance passed)](plans/2026-10-05-multiuser-pr3-read-only-inventory.md) |
@@ -123,6 +125,7 @@ live gate is explicitly pending.
 
 | Date | Document |
 | --- | --- |
+| 2026-10-12 | [`hmi_read` completion live acceptance — PASS with recorded limits: cursor paging (21 s first page, under 1 s per continuation), cursor failure categories, `memberTags`/`loggingTags`/`screenItems` with a real `Dynamization` finding, `{hmi}` cross-references, runtime-settings allow-list, Classic-only failure, 42-row regression; worker restart surfaces `binding_conflict` instead of `snapshot_unavailable` (accepted); observations O1-O6](acceptance/reports/2026-10-12-hmi-read-completion-live-acceptance.md) |
 | 2026-10-09 | [OB creation live acceptance (issue #75) — all 15 classes created on an S7-1500 with planned = actual numbers, duplicate singleton blocked in `dryRun` and actual, S7-1200 refusal carries TIA's text, STL FB/FC/OB created, full compile clean except the HardwareInterrupt trigger warning; no defects](acceptance/reports/2026-10-09-ob-creation-live-acceptance.md) |
 | 2026-10-08 | [OB creation Phase 0 spike (issue #75) — SimaticML import passes under the SimaticSD default; import never renumbers and accepts duplicate singletons; STL rejects `SetENOAutomatically`; S7-1200 import refuses unsupported classes, S7-1200 G2 accepts all](acceptance/reports/2026-10-08-ob-creation-spike.md) |
 | 2026-10-08 | [Multiuser PR4 — scoped maintainer acceptance, offline dialog failures, audits and restoration](acceptance/reports/2026-10-08-multiuser-pr4-live-verification.md) |
