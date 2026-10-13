@@ -1,5 +1,7 @@
 # TIA Portal MCP server
 
+> **BetterTIA Reader** — this is a fork of [Czarnak/tia-portal-mcp](https://github.com/Czarnak/tia-portal-mcp) (MIT). It adds read-only export tools (project to folder, WinCC Unified HMI, object cross-references); see [ANET.md](ANET.md). Everything below is the upstream README.
+
 [![Build Status](https://img.shields.io/github/actions/workflow/status/Czarnak/tia-portal-mcp/ci.yml?branch=main&style=flat-square)](https://github.com/Czarnak/tia-portal-mcp/actions)
 [![Codecov](https://img.shields.io/codecov/c/github/Czarnak/tia-portal-mcp?style=flat-square)](https://codecov.io/gh/Czarnak/tia-portal-mcp)
 [![GitHub Release](https://img.shields.io/github/v/release/Czarnak/tia-portal-mcp?style=flat-square)](https://github.com/Czarnak/tia-portal-mcp/releases)
