@@ -6,6 +6,7 @@ using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
 using Siemens.Engineering.SW.Tags;
 using Siemens.Engineering.SW.Types;
+using Siemens.Engineering.SW.Units;
 using TiaMcpServer.Contracts;
 
 namespace TiaMcpServer.OpennessWorker.Openness;
@@ -26,6 +27,11 @@ internal static class ObjectCrossReferenceReader
 {
     private const int ResponseCharBudget = 25_000;
     private const int DefaultMaxLocations = 2_000;
+
+    // Members Openness refused to give us in the current Read; they come back as empty values, which
+    // would otherwise look like "no references". shortcut: static, the worker serves one request at a
+    // time; make it per-call state if requests ever run concurrently.
+    private static int unreadable;
 
     private static readonly JsonSerializerOptions Json = new()
     {
@@ -54,6 +60,7 @@ internal static class ObjectCrossReferenceReader
                 "filter must be AllObjects, ObjectsWithReferences, ObjectsWithoutReferences or UnusedObjects."),
         };
         var maxLocations = request.MaxResults is > 0 ? request.MaxResults.Value : DefaultMaxLocations;
+        unreadable = 0;
 
         var plcSoftware = PlcSoftwareLocator.Find(project, request.PlcName ?? PlcNameOf(request.ObjectPath!));
         var target = Resolve(plcSoftware, request.ObjectPath!.Trim());
@@ -124,6 +131,13 @@ internal static class ObjectCrossReferenceReader
             result.Note ??= "For code blocks TIA returns what the block uses; callers of an FC are not included - search the export_to_folder files for the block name.";
         }
 
+        if (unreadable > 0)
+        {
+            result.Incomplete = true;
+            result.UnreadableMembers = unreadable;
+            result.Warning = $"{unreadable} member(s) could not be read from TIA and appear empty, so a missing reference is NOT proof that nothing uses this object. Re-run, or check the object in TIA.";
+        }
+
         var serialized = JsonSerializer.Serialize(result, Json);
         if (serialized.Length > ResponseCharBudget)
         {
@@ -185,6 +199,7 @@ internal static class ObjectCrossReferenceReader
             }
             catch (Exception exception)
             {
+                unreadable++;
                 caller.UsedBy.Add("error: " + exception.Message);
             }
 
@@ -207,6 +222,7 @@ internal static class ObjectCrossReferenceReader
                 }
                 catch (Exception)
                 {
+                    unreadable++;
                 }
 
                 if (string.Equals(of, fbName, StringComparison.Ordinal))
@@ -293,9 +309,19 @@ internal static class ObjectCrossReferenceReader
             segments.RemoveAt(0);
         }
 
+        // PLC/Units/<unit>/Blocks|Types|Tags/... addresses a software unit; everything else is the PLC itself.
+        var scopes = Scopes(plc);
+        var scope = scopes[0];
+        if (segments.Count >= 3 && segments[0].Equals("Units", StringComparison.OrdinalIgnoreCase))
+        {
+            var index = scopes.FindIndex(s => s.Prefix.Equals("Units/" + segments[1] + "/", StringComparison.OrdinalIgnoreCase));
+            scope = index > 0 ? scopes[index] : throw NotFound(objectPath);
+            segments.RemoveRange(0, 2);
+        }
+
         if (segments.Count >= 2 && segments[0].Equals("Blocks", StringComparison.OrdinalIgnoreCase))
         {
-            var group = WalkBlockGroups(plc.BlockGroup, segments.Skip(1).Take(segments.Count - 2), objectPath);
+            var group = WalkBlockGroups(scope.Blocks, segments.Skip(1).Take(segments.Count - 2), objectPath);
             var block = group.Blocks.Find(segments[segments.Count - 1])
                 ?? throw NotFound(objectPath);
             return new ResolvedObject(block, "block", objectPath);
@@ -303,7 +329,7 @@ internal static class ObjectCrossReferenceReader
 
         if (segments.Count >= 2 && segments[0].Equals("Types", StringComparison.OrdinalIgnoreCase))
         {
-            PlcTypeGroup group = plc.TypeGroup;
+            PlcTypeGroup group = scope.Types;
             foreach (var groupName in segments.Skip(1).Take(segments.Count - 2))
             {
                 group = group.Groups.Find(groupName) ?? throw NotFound(objectPath);
@@ -316,7 +342,7 @@ internal static class ObjectCrossReferenceReader
         if (segments.Count >= 2 && segments[0].Equals("Tags", StringComparison.OrdinalIgnoreCase))
         {
             // PLC/Tags/<groups>/<table>  or  PLC/Tags/<groups>/<table>/<tag>
-            PlcTagTableGroup group = plc.TagTableGroup;
+            PlcTagTableGroup group = scope.Tags;
             var rest = segments.Skip(1).ToList();
             for (var i = 0; i < rest.Count; i++)
             {
@@ -339,21 +365,29 @@ internal static class ObjectCrossReferenceReader
             throw NotFound(objectPath);
         }
 
-        // Bare name: unique block, then tag, then type anywhere in the PLC.
+        // Bare name: unique block, then tag, then type anywhere in the PLC, its software units and its system blocks.
         var name = segments.Count == 0 ? objectPath : segments[segments.Count - 1];
-        var blocks = FindBlocks(plc.BlockGroup, name, "Blocks").ToList();
+        var blocks = scopes.SelectMany(s => FindBlocks(s.Blocks, name, s.Prefix + "Blocks")).ToList();
+        if (plc.BlockGroup is PlcBlockSystemGroup system)
+        {
+            foreach (PlcSystemBlockGroup systemGroup in SafeEnumerate(() => system.SystemBlockGroups))
+            {
+                blocks.AddRange(FindSystemBlocks(systemGroup, name, "SystemBlocks/" + Safe(() => systemGroup.Name)));
+            }
+        }
+
         if (blocks.Count == 1)
         {
             return new ResolvedObject(blocks[0].Block, "block", plc.Name + "/" + blocks[0].Path);
         }
 
-        var tags = FindTags(plc.TagTableGroup, name, "Tags").ToList();
+        var tags = scopes.SelectMany(s => FindTags(s.Tags, name, s.Prefix + "Tags")).ToList();
         if (blocks.Count == 0 && tags.Count == 1)
         {
             return new ResolvedObject(tags[0].Tag, "tag", plc.Name + "/" + tags[0].Path);
         }
 
-        var types = FindTypes(plc.TypeGroup, name, "Types").ToList();
+        var types = scopes.SelectMany(s => FindTypes(s.Types, name, s.Prefix + "Types")).ToList();
         if (blocks.Count == 0 && tags.Count == 0 && types.Count == 1)
         {
             return new ResolvedObject(types[0].Type, "type", plc.Name + "/" + types[0].Path);
@@ -376,7 +410,53 @@ internal static class ObjectCrossReferenceReader
         return group;
     }
 
-    private static IEnumerable<(PlcBlock Block, string Path)> FindBlocks(PlcBlockGroup group, string name, string path)
+    // The PLC itself first, then one scope per software unit (units are optional: no provider without them).
+    private static List<(PlcBlockGroup Blocks, PlcTagTableGroup Tags, PlcTypeGroup Types, string Prefix)> Scopes(PlcSoftware plc)
+    {
+        var scopes = new List<(PlcBlockGroup, PlcTagTableGroup, PlcTypeGroup, string)>
+        {
+            (plc.BlockGroup, plc.TagTableGroup, plc.TypeGroup, string.Empty),
+        };
+        try
+        {
+            var provider = plc.GetService<PlcUnitProvider>();
+            if (provider is not null)
+            {
+                foreach (PlcUnit unit in provider.UnitGroup.Units)
+                {
+                    scopes.Add((unit.BlockGroup, unit.TagTableGroup, unit.TypeGroup, "Units/" + unit.Name + "/"));
+                }
+            }
+        }
+        catch (Exception)
+        {
+            unreadable++;
+        }
+
+        return scopes;
+    }
+
+    private static IEnumerable<(IEngineeringServiceProvider Block, string Path)> FindSystemBlocks(PlcSystemBlockGroup group, string name, string path)
+    {
+        foreach (var block in SafeEnumerate(() => group.Blocks))
+        {
+            var blockName = Safe(() => ((IEngineeringObject)block).GetAttribute("Name"));
+            if (string.Equals(blockName, name, StringComparison.OrdinalIgnoreCase))
+            {
+                yield return ((IEngineeringServiceProvider)block, path + "/" + blockName);
+            }
+        }
+
+        foreach (PlcSystemBlockGroup child in SafeEnumerate(() => group.Groups))
+        {
+            foreach (var match in FindSystemBlocks(child, name, path + "/" + Safe(() => child.Name)))
+            {
+                yield return match;
+            }
+        }
+    }
+
+    private static IEnumerable<(IEngineeringServiceProvider Block, string Path)> FindBlocks(PlcBlockGroup group, string name, string path)
     {
         foreach (PlcBlock block in group.Blocks)
         {
@@ -442,7 +522,7 @@ internal static class ObjectCrossReferenceReader
 
     private static WorkerOperationException NotFound(string objectPath)
         => new(WorkerFailureCategories.ValidationError,
-            $"Object '{objectPath}' was not found. Use paths like PLC/Blocks/<groups>/<block>, PLC/Types/<groups>/<type>, PLC/Tags/<groups>/<table>[/<tag>] (as in export_to_folder manifest) or a unique name.");
+            $"Object '{objectPath}' was not found. Use paths like PLC/Blocks/<groups>/<block>, PLC/Types/<groups>/<type>, PLC/Tags/<groups>/<table>[/<tag>] (as in export_to_folder manifest), PLC/Units/<unit>/Blocks|Types|Tags/... for a software unit, or a unique name (also finds system blocks).");
 
     private static string Safe(Func<object?> read)
     {
@@ -452,6 +532,7 @@ internal static class ObjectCrossReferenceReader
         }
         catch (Exception)
         {
+            unreadable++;
             return string.Empty;
         }
     }
@@ -467,6 +548,7 @@ internal static class ObjectCrossReferenceReader
         }
         catch (Exception)
         {
+            unreadable++;
             yield break;
         }
 
@@ -501,6 +583,9 @@ internal sealed class ObjectCrossReferenceResult
     public int ReferencingObjectCount { get; set; }
     public int LocationCount { get; set; }
     public bool Truncated { get; set; }
+    public bool? Incomplete { get; set; }
+    public int? UnreadableMembers { get; set; }
+    public string? Warning { get; set; }
     public string? Note { get; set; }
     public string? File { get; set; }
     public List<ObjectCrossReferenceSummary> Summary { get; set; } = new();
