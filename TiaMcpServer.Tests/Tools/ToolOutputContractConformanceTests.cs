@@ -38,6 +38,7 @@ public sealed class ToolOutputContractConformanceTests
             ["export_to_folder"] = "ANet fork tool; same text envelope as get_project_status.",
             ["export_hmi_to_folder"] = "ANet fork tool; same text envelope as get_project_status.",
             ["cross_references_for"] = "ANet fork tool; same text envelope as get_project_status.",
+            ["read_technology_object"] = "ANet fork tool; same text envelope as get_project_status.",
             ["compile_check"] = Phase2,
             ["open_project"] = Phase3,
             ["create_project"] = Phase3,

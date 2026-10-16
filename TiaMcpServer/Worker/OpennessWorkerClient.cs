@@ -835,6 +835,31 @@ public class OpennessWorkerClient : IDisposable
             "{}");
     }
 
+    /// <summary>ANet fork: technology objects of one PLC, or the parameters of one of them.</summary>
+    public Task<WorkerCallResult> ReadTechnologyObjectAsync(
+        string? name,
+        string? exportRoot,
+        string? projectPath,
+        string? plcName,
+        IReadOnlyList<string>? parameterPrefixes,
+        int? maxParameters,
+        bool? includeXml)
+    {
+        return SendBoundProjectRequestAsync(
+            "read_technology_object",
+            projectPath,
+            request =>
+            {
+                request.ObjectPath = name;
+                request.ExportRoot = exportRoot;
+                request.PlcName = plcName;
+                request.ExportPathPrefixes = parameterPrefixes?.ToList();
+                request.MaxResults = maxParameters;
+                request.IncludeXmlExport = includeXml;
+            },
+            "{}");
+    }
+
     /// <summary>ANet fork: chunked JSON dump of a WinCC Unified HMI into the export root.</summary>
     public Task<WorkerCallResult> ExportHmiToFolderAsync(
         string? exportRoot,

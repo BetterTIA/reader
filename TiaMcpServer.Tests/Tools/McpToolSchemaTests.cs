@@ -184,6 +184,7 @@ public class McpToolSchemaTests
             "export_to_folder",
             "export_hmi_to_folder",
             "cross_references_for",
+            "read_technology_object",
             "compile_check",
             "open_project",
             "create_project",
@@ -218,7 +219,7 @@ public class McpToolSchemaTests
             .ToArray();
 
         Assert.Equal(
-            new[] { "browse_project_tree", "cross_references_for", "execute_read_batch", "export_hmi_to_folder", "export_to_folder", "get_project_status", "network_read" },
+            new[] { "browse_project_tree", "cross_references_for", "execute_read_batch", "export_hmi_to_folder", "export_to_folder", "get_project_status", "network_read", "read_technology_object" },
             toolNames);
         Assert.DoesNotContain("probe_network_object_attributes", toolNames);
     }

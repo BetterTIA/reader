@@ -414,6 +414,9 @@ public class WorkerRequest
     /// <summary>Forwarded by: read_object_cross_references. Block/type/tag-table/tag path or unique name.</summary>
     public string? ObjectPath { get; set; }
 
+    /// <summary>Forwarded by: read_technology_object. Also write the SimaticML export of the object under the export root.</summary>
+    public bool? IncludeXmlExport { get; set; }
+
     /// <summary>Forwarded by: export_hmi_to_folder. HMI software or device name.</summary>
     public string? ExportDeviceName { get; set; }
 

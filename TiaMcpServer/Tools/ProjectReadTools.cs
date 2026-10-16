@@ -87,6 +87,33 @@ public class ProjectReadTools
         return StandaloneToolResultFormatter.Format(result, "Narrow objectPath to a single member or tag.");
     }
 
+    [McpServerTool(Name = "read_technology_object", ReadOnly = true, Destructive = false, OpenWorld = false)]
+    [Description("Offline configuration of technology objects (PID_Temp, PID_Compact, motion axes...), which the block tools do not see. "
+        + "Without name: lists the technology objects of the PLC (name, type, version, DB number, folder). "
+        + "With name: returns its parameters as name/value pairs (e.g. Config.InputUpperLimit, Config.Output..., Retain.CtrlParams.Heat.Gain), "
+        + "optionally narrowed by parameterPrefixes. includeXml also writes the SimaticML export of the object under the export root. "
+        + "Live values: BTIA Watch watch_db with the technology object name. The project is not modified.")]
+    public static async Task<string> ReadTechnologyObject(
+        OpennessWorkerClient workerClient,
+        TiaMcpServer.Export.ExportRootOptions exportRootOptions,
+        [Description("Optional technology object name. Empty: list all technology objects of the PLC.")] string? name = null,
+        [Description("Optional parameter path prefixes, e.g. Config, Retain.CtrlParams, Sts. Whole path segments, case-insensitive: Config matches Config.InputUpperLimit, not ConfigX.")] string[]? parameterPrefixes = null,
+        [Description("Optional cap on returned parameters (default 1000).")] int? maxParameters = null,
+        [Description("Optional: also export the technology object as SimaticML .xml under the export root (default false).")] bool? includeXml = null,
+        [Description("Optional PLC software or device name. Required only when the project has more than one PLC.")] string? plcName = null,
+        [Description("Optional path to a .ap21 project file. If omitted, uses the project currently open in TIA Portal.")] string? projectPath = null)
+    {
+        var result = await workerClient.ReadTechnologyObjectAsync(
+            name,
+            exportRootOptions.ExportRoot,
+            projectPath,
+            plcName,
+            parameterPrefixes,
+            maxParameters,
+            includeXml).ConfigureAwait(false);
+        return StandaloneToolResultFormatter.Format(result, "Narrow parameterPrefixes or lower maxParameters.");
+    }
+
     [McpServerTool(Name = "export_hmi_to_folder", ReadOnly = true, Destructive = false, OpenWorld = false)]
     [Description("Dump a WinCC Unified HMI into JSON files under the server's configured export root: one file per screen "
         + "(screen attributes plus every screen item with its type, geometry Left/Top/Width/Height, colors, texts, fonts, "

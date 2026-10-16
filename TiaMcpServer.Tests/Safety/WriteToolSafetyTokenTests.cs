@@ -47,7 +47,7 @@ public class WriteToolSafetyTokenTests
             new[]
             {
                 "archive_project", "browse_project_tree", "close_project", "create_project", "cross_references_for", "export_hmi_to_folder", "export_to_folder", "get_project_status",
-                "open_project", "save_project", "save_project_as"
+                "open_project", "read_technology_object", "save_project", "save_project_as"
             },
             allToolNames);
     }

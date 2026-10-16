@@ -153,6 +153,7 @@ internal static class Program
                 "delete_subnet" => DeleteSubnet(request),
                 "read_cross_references" => ReadCrossReferences(request),
                 "read_object_cross_references" => ReadObjectCrossReferences(request),
+                "read_technology_object" => ReadTechnologyObject(request),
                 "get_block_content"   => GetBlockContent(request),
                 "update_block_logic"  => UpdateBlockLogic(request),
                 "get_type_content"    => GetTypeContent(request),
@@ -818,6 +819,10 @@ internal static class Program
     /// <summary>ANet fork: cross-references of one object (who reads/writes/calls it).</summary>
     private static WorkerResponse ReadObjectCrossReferences(WorkerRequest request)
         => WithProject(request, project => Success(ObjectCrossReferenceReader.Read(project, request)));
+
+    /// <summary>ANet fork: technology objects (PID_Temp, PID_Compact...): list, parameters of one, optional XML export.</summary>
+    private static WorkerResponse ReadTechnologyObject(WorkerRequest request)
+        => WithProject(request, project => Success(TechnologicalObjectReader.Read(project, request)));
 
     private static WorkerResponse GetBlockContent(WorkerRequest request)
     {
