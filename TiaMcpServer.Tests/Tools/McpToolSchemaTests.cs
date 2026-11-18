@@ -157,12 +157,12 @@ public class McpToolSchemaTests
     /// ProjectLifecycleTools lives in - which, for TiaMcpServer.Tests, is the test assembly
     /// itself, since the host's tool source files are compiled directly into it (see
     /// TiaMcpServer.Tests.csproj's Compile Include entries). Counts every method on those types
-    /// carrying [McpServerTool] and asserts the exact approved surface: 14 tools total, and the
+    /// carrying [McpServerTool] and asserts the exact approved surface: 18 tools total, and the
     /// internal lifecycle probe (probe_project_status_for_lifecycle, never [McpServerTool]-decorated)
     /// absent.
     /// </summary>
     [Fact]
-    public void McpToolSurface_ExposesExactlyFourteenApprovedTools()
+    public void McpToolSurface_ExposesExactlyTheApprovedTools()
     {
         var toolTypes = typeof(ProjectLifecycleTools).Assembly
             .GetTypes()
@@ -203,7 +203,7 @@ public class McpToolSchemaTests
     }
 
     [Fact]
-    public void McpReadOnlySurface_RemainsExactlyFourApprovedTools()
+    public void McpReadOnlySurface_RemainsExactlyTheApprovedTools()
     {
         var toolNames = new[]
         {

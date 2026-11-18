@@ -18,9 +18,20 @@ MCP server for Siemens SIMATIC TIA Portal V21. It lets MCP clients and AI agents
 
 The current implementation covers project discovery and lifecycle operations, PLC block export/import, tag table reads and guarded tag mutations, hardware/network discovery, cross-reference diagnostics, hardware catalog search, guarded network-device provisioning, and compile/check diagnostics.
 
+## BetterTIA compatibility
+
+| Tool | Access | TIA Portal V21 |
+| --- | --- | --- |
+| reader (this repository) | read-only by default (`--access-mode read-write` adds the upstream write tools) | tested |
+| [writer](https://github.com/BetterTIA/writer) | writes to the project through Openness | tested |
+| [editor](https://github.com/BetterTIA/editor) | proposes edits; a person approves them in its UI | tested |
+| [watch](https://github.com/BetterTIA/watch) | read-only view of live PLC data | tested |
+
+All four are tested only with TIA Portal V21. Other TIA Portal versions have not been tested.
+
 ## Tools
 
-The server currently exposes 14 tools in read-write mode and 4 tools in read-only mode.
+The server currently exposes 18 tools in read-write mode and 8 tools in read-only mode (a test keeps these numbers in line with the registered tools).
 
 ### Batch operations
 

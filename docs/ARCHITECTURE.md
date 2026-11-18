@@ -53,7 +53,7 @@ falling back to another mode.
 
 ### Read-write mode
 
-Read-write mode exposes 14 tools: the four read-only observation tools plus ten
+Read-write mode exposes 18 tools: the eight read-only observation tools plus ten
 read-write-only tools. It preserves the preview-then-apply safety-token model.
 
 ### Read-only mode

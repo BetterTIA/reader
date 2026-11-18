@@ -1,6 +1,6 @@
 # Project overview
 
-MCP server for Siemens TIA Portal V21. Exposes 14 tools in read-write mode and four read-only tools in read-only mode. Windows-only, requires TIA Portal V21 with Openness enabled.
+MCP server for Siemens TIA Portal V21. Exposes 18 tools in read-write mode and eight read-only tools in read-only mode. Windows-only, requires TIA Portal V21 with Openness enabled.
 
 ## Two-process architecture (critical to understand)
 

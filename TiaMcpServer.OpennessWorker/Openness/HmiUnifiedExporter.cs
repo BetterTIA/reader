@@ -40,6 +40,13 @@ internal static class HmiUnifiedExporter
     private const int MaxListItems = 50;
     private const int MaxReportedFailures = 25;
     private static readonly TimeSpan DefaultBudget = TimeSpan.FromSeconds(35);
+    // What this export could not read, and the item being dumped. shortcut: static, the worker serves
+    // one request at a time; make it per-call state if requests ever run concurrently.
+    private static SkippedLog skipped = new();
+    private static string? currentItem;
+
+    private static void Skip(string what, Exception exception) => skipped.Add(currentItem, what, exception);
+
     private static readonly Regex RunIdPattern = new("^[0-9]{8}-[0-9]{6}$", RegexOptions.CultureInvariant);
 
     /// <summary>Attributes kept in layout mode (when the object exposes them).</summary>
@@ -66,6 +73,8 @@ internal static class HmiUnifiedExporter
 
     public static HmiUnifiedExportResult Export(Project project, WorkerRequest request)
     {
+        skipped = new SkippedLog();
+        currentItem = null;
         var exportRoot = ValidateExportRoot(request.ExportRoot);
         var include = NormalizeSet(request.ExportInclude,
             new[] { IncludeScreens, IncludeTags, IncludeAlarms, IncludeConnections }, "include");
@@ -118,7 +127,8 @@ internal static class HmiUnifiedExporter
         };
 
         var index = offset;
-        using (var manifest = new StreamWriter(manifestPath, append: true, new UTF8Encoding(false)))
+        var manifest = ManifestStore.Load(manifestPath);
+        try
         {
             while (index < items.Count)
             {
@@ -128,6 +138,7 @@ internal static class HmiUnifiedExporter
                 }
 
                 var item = items[index];
+                currentItem = item.Path;
                 var entry = new HmiManifestEntry { Kind = item.Kind, Path = item.Path };
                 try
                 {
@@ -154,12 +165,22 @@ internal static class HmiUnifiedExporter
                     }
                 }
 
-                manifest.WriteLine(JsonSerializer.Serialize(entry, ManifestJson));
+                manifest.Upsert(entry.Path, JsonSerializer.Serialize(entry, ManifestJson));
                 result.ProcessedItems++;
                 index++;
             }
+
+            currentItem = null;
+        }
+        finally
+        {
+            // One line per object path, so a repeated chunk replaces instead of duplicating.
+            manifest.Save(manifestPath);
         }
 
+        result.SkippedCount = skipped.Total;
+        result.Skipped = skipped.Entries;
+        result.Warning = skipped.Warning;
         result.Complete = index >= items.Count;
         result.NextOffset = result.Complete ? null : index;
         result.ElapsedMs = stopwatch.ElapsedMilliseconds;
@@ -260,6 +281,7 @@ internal static class HmiUnifiedExporter
         catch (Exception exception)
         {
             node["$error"] = "attributes: " + exception.Message;
+            Skip("attribute list of " + node["$type"], exception);
             return node;
         }
 
@@ -270,7 +292,8 @@ internal static class HmiUnifiedExporter
         }
         catch (Exception)
         {
-            // One unreadable attribute fails the batch; fall back to one call per attribute.
+            // Not a loss: one unreadable attribute fails the batch, so every attribute is retried
+            // one by one below, and the ones that still fail are reported in skipped.
         }
 
         for (var i = 0; i < names.Count; i++)
@@ -286,8 +309,9 @@ internal static class HmiUnifiedExporter
                 {
                     value = engineering.GetAttribute(names[i]);
                 }
-                catch (Exception)
+                catch (Exception exception)
                 {
+                    Skip("attribute " + names[i] + " of " + node["$type"], exception);
                     continue;
                 }
             }
@@ -393,8 +417,10 @@ internal static class HmiUnifiedExporter
         {
             return nested.GetCompositionInfos().Any(info => !string.Equals(info.Name, "Items", StringComparison.Ordinal));
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            // Treated as value-like and dumped in full; noted because the dump may then be larger or deeper.
+            Skip("composition list of " + typeName, exception);
             return false;
         }
     }
@@ -405,8 +431,9 @@ internal static class HmiUnifiedExporter
         {
             return engineering.GetAttribute("Name")?.ToString() ?? engineering.GetType().Name;
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            Skip("name of " + engineering.GetType().Name + " (type name used instead)", exception);
             return engineering.GetType().Name;
         }
     }
@@ -492,8 +519,9 @@ internal static class HmiUnifiedExporter
         {
             return engineering.GetCompositionInfos().Any(info => string.Equals(info.Name, name, StringComparison.Ordinal));
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            Skip("composition list of " + engineering.GetType().Name + " (looking for " + name + ")", exception);
             return false;
         }
     }
@@ -510,8 +538,9 @@ internal static class HmiUnifiedExporter
         {
             composition = engineering.GetComposition(name);
         }
-        catch (Exception)
+        catch (Exception exception)
         {
+            Skip("composition " + name + " of " + engineering.GetType().Name, exception);
             return Array.Empty<IEngineeringObject>();
         }
 
@@ -732,6 +761,9 @@ internal sealed class HmiUnifiedExportResult
     public int? NextOffset { get; set; }
     public long ElapsedMs { get; set; }
     public List<ProjectFolderExportFailure> Failures { get; set; } = new();
+    public int SkippedCount { get; set; }
+    public List<SkippedEntry> Skipped { get; set; } = new();
+    public string? Warning { get; set; }
 }
 
 internal sealed class HmiManifestEntry

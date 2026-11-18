@@ -123,7 +123,8 @@ internal static class ProjectFolderExporter
         };
 
         var index = offset;
-        using (var manifest = new StreamWriter(manifestPath, append: true, new UTF8Encoding(false)))
+        var manifest = ManifestStore.Load(manifestPath);
+        try
         {
             while (index < items.Count)
             {
@@ -134,7 +135,7 @@ internal static class ProjectFolderExporter
 
                 var item = items[index];
                 var entry = ExportItem(item, plcDirectory, plcSoftware, formats);
-                manifest.WriteLine(JsonSerializer.Serialize(entry, ManifestJsonOptions));
+                manifest.Upsert(entry.Path, JsonSerializer.Serialize(entry, ManifestJsonOptions));
                 result.ProcessedItems++;
                 if (entry.Error is null)
                 {
@@ -153,6 +154,11 @@ internal static class ProjectFolderExporter
                 result.TotalBytes += entry.Files.Sum(file => file.Bytes);
                 index++;
             }
+        }
+        finally
+        {
+            // One line per object path, so a repeated chunk replaces instead of duplicating.
+            manifest.Save(manifestPath);
         }
 
         result.Complete = index >= items.Count;

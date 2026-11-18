@@ -31,7 +31,7 @@ npx -y @modelcontextprotocol/inspector dotnet .\TiaMcpServer\bin\Debug\net10.0\T
 In the Inspector UI:
 
 - Open the Tools tab.
-- Click `List Tools` and verify the 14 tools appear in read-write mode (or the four observation tools in read-only mode).
+- Click `List Tools` and verify the 18 tools appear in read-write mode (or the eight observation tools in read-only mode).
 - Start with the standalone `get_project_status` and `browse_project_tree` tools.
 - In read-write mode, call standalone `compile_check` for PLC or block compilation.
 - Then call `execute_read_batch` with an `operations` array whose items use retained operations such as `list_tag_tables`, `read_cross_references`, or `get_block_content`.

@@ -25,6 +25,7 @@ internal static class TechnologicalObjectReader
 
     public static TechnologicalObjectResult Read(Project project, WorkerRequest request)
     {
+        var xmlWarning = IncludeXmlCheck.Validate(request.IncludeXmlExport, request.ObjectPath, request.ExportRoot);
         var plcSoftware = PlcSoftwareLocator.Find(project, request.PlcName);
         var all = Enumerate(plcSoftware.TechnologicalObjectGroup, string.Empty).ToList();
 
@@ -32,6 +33,7 @@ internal static class TechnologicalObjectReader
         {
             PlcName = plcSoftware.Name,
             Count = all.Count,
+            Warning = xmlWarning,
         };
 
         if (string.IsNullOrWhiteSpace(request.ObjectPath))
@@ -124,7 +126,8 @@ internal static class TechnologicalObjectReader
         {
             result.Incomplete = true;
             result.UnreadableParameters = unreadable;
-            result.Warning = $"{unreadable} parameter(s) could not be read from TIA; their values are missing or carry an error.";
+            result.Warning = (result.Warning is null ? string.Empty : result.Warning + " ")
+                + $"{unreadable} parameter(s) could not be read from TIA; their values are missing or carry an error.";
         }
 
         if (request.IncludeXmlExport == true)
