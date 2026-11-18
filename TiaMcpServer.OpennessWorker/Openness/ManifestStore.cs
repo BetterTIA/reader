@@ -66,7 +66,14 @@ internal sealed class ManifestStore
     {
         var temporary = path + ".tmp";
         File.WriteAllLines(temporary, order.Select(key => lines[key]), new UTF8Encoding(false));
-        File.Delete(path);
-        File.Move(temporary, path);
+        // Replace keeps the old manifest until the new one is complete (Delete + Move left a gap).
+        if (File.Exists(path))
+        {
+            File.Replace(temporary, path, null);
+        }
+        else
+        {
+            File.Move(temporary, path);
+        }
     }
 }
