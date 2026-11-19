@@ -606,7 +606,7 @@ try {
     $ManifestPath = Assert-PrivatePath $ManifestPath
     $manifest = ConvertFrom-Json (Get-Content -LiteralPath $ManifestPath -Raw) -AsHashtable -Depth 100
     $runtimeRoot = [IO.Path]::GetFullPath((Join-Path $script:Root 'TiaMcpServer/bin/Debug/net10.0'))
-    $hostDll = Join-Path $runtimeRoot 'TiaMcpServer.dll'
+    $hostDll = Join-Path $runtimeRoot 'BtiaReader.dll'
     $workerExe = Join-Path $runtimeRoot 'openness-worker/TiaMcpServer.OpennessWorker.exe'
     $assertedCandidate = Assert-Candidate
     $outputPath = Assert-PrivatePath (Join-Path $script:EvidenceRoot (([DateTime]::UtcNow.ToString('yyyyMMdd-HHmmssfff')) + '-' + [Guid]::NewGuid().ToString('N') + '.json'))

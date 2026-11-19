@@ -37,16 +37,24 @@ internal static class ExecutableResolver
             }
         }
 
-        // 4. Environment.ProcessPath (if tia-mcp)
+        // 4. Environment.ProcessPath (if tia-mcp or BtiaReader)
         var processPath = Environment.ProcessPath;
         if (!string.IsNullOrEmpty(processPath) &&
-            Path.GetFileNameWithoutExtension(processPath).Equals("tia-mcp", StringComparison.OrdinalIgnoreCase) &&
+            IsServerExecutableName(processPath) &&
             File.Exists(processPath))
         {
             return processPath;
         }
 
         return null;
+    }
+
+    // The global tool shim is tia-mcp.exe; the host assembly (self-contained bundle) is BtiaReader.exe.
+    internal static bool IsServerExecutableName(string path)
+    {
+        var name = Path.GetFileNameWithoutExtension(path);
+        return name.Equals("tia-mcp", StringComparison.OrdinalIgnoreCase) ||
+               name.Equals("BtiaReader", StringComparison.OrdinalIgnoreCase);
     }
 
     public static ExecutableResolutionResult ResolveClientExecutable(string command)

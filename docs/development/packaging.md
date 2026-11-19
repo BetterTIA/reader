@@ -2,6 +2,7 @@
 
 How to build the NuGet package from a source checkout and install that local build as the
 `tia-mcp` global tool, plus how to revert to the published version.
+The host assembly is `BtiaReader` (`BtiaReader.dll` / `BtiaReader.exe` in a self-contained publish); the global tool command stays `tia-mcp`.
 
 ## Local Package Build
 

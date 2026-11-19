@@ -16,15 +16,15 @@ Both profiles start the server with --read-only. This script does not call save,
 write, preview, apply, project lifecycle, compile, or network-write tools.
 
 .EXAMPLE
-pwsh ./scripts/live-test-project-tree-v3.ps1 -AcceptanceProfile BlockHeaders -ProjectPath C:\Projects\Disposable.ap21 -ServerPath C:\Builds\main\TiaMcpServer.exe -EvidencePath ./artifacts/issue-30-live/main.json
+pwsh ./scripts/live-test-project-tree-v3.ps1 -AcceptanceProfile BlockHeaders -ProjectPath C:\Projects\Disposable.ap21 -ServerPath C:\Builds\main\BtiaReader.exe -EvidencePath ./artifacts/issue-30-live/main.json
 
 .EXAMPLE
-pwsh ./scripts/live-test-project-tree-v3.ps1 -AcceptanceProfile BlockHeaders -ProjectPath C:\Projects\Disposable.ap21 -ServerPath ./TiaMcpServer/bin/Release/net10.0/TiaMcpServer.exe -EvidencePath ./artifacts/issue-30-live/candidate.json -BlockHeaderExpectationsPath ./artifacts/issue-30-live/expectations.json -BaselineEvidencePath ./artifacts/issue-30-live/main.json
+pwsh ./scripts/live-test-project-tree-v3.ps1 -AcceptanceProfile BlockHeaders -ProjectPath C:\Projects\Disposable.ap21 -ServerPath ./TiaMcpServer/bin/Release/net10.0/BtiaReader.exe -EvidencePath ./artifacts/issue-30-live/candidate.json -BlockHeaderExpectationsPath ./artifacts/issue-30-live/expectations.json -BaselineEvidencePath ./artifacts/issue-30-live/main.json
 #>
 [CmdletBinding()]
 param(
     [string] $ProjectPath = $env:TIA_MCP_LIVE_PROJECT_PATH,
-    [string] $ServerPath = (Join-Path $PSScriptRoot '..\TiaMcpServer\bin\Release\net10.0\TiaMcpServer.exe'),
+    [string] $ServerPath = (Join-Path $PSScriptRoot '..\TiaMcpServer\bin\Release\net10.0\BtiaReader.exe'),
     [string] $EvidencePath = (Join-Path $PSScriptRoot '..\artifacts\issue-32-live\project-tree-v3-evidence.json'),
     [ValidateSet('FullV3', 'BlockHeaders')]
     [string] $AcceptanceProfile = 'FullV3',

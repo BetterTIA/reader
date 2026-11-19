@@ -135,7 +135,7 @@ Options:
 - `--name <name>` - server registration name (default: `tia-portal`).
 - `--access-mode <mode>` - access mode: `read-only` or `read-write` (default: `read-only`).
 - `--tia-project <path>` - bind to a specific TIA Portal project.
-- `--server-path <path>` - explicit path to the `tia-mcp` executable.
+- `--server-path <path>` - explicit path to the `tia-mcp` executable (or `BtiaReader.exe` from a self-contained build).
 - `--dry-run` - print the install command without executing.
 - `--json` - emit JSON output (not supported with MiMoCode).
 

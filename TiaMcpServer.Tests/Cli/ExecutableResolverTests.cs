@@ -7,6 +7,17 @@ public class ExecutableResolverTests
 {
     // --- Server executable resolution ---
 
+    [Theory]
+    [InlineData(@"C:\x\tia-mcp.exe", true)]
+    [InlineData(@"C:\x\BtiaReader.exe", true)]
+    [InlineData(@"C:\x\btiareader", true)]
+    [InlineData(@"C:\x\TiaMcpServer.exe", false)]
+    [InlineData(@"C:\x\BtiaWriter.exe", false)]
+    public void IsServerExecutableName_AcceptsToolShimAndHostName(string path, bool expected)
+    {
+        Assert.Equal(expected, ExecutableResolver.IsServerExecutableName(path));
+    }
+
     [Fact]
     public void ResolveServerExecutable_ExplicitPath_ReturnsPath()
     {
