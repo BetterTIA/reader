@@ -35,7 +35,9 @@ public class ProjectReadTools
         + "Blocks: documents (.s7dcl/.s7res, readable LAD/FBD/SCL/DB) and source (.scl/.db where eligible), SimaticML .xml on request "
         + "and automatically when documents are unavailable (GRAPH, STL); types: .udt (xml fallback); tag tables: SimaticML .xml. "
         + "Work is chunked by time: repeat the call with the returned runId and nextOffset until complete is true. "
-        + "The response lists the export folder and manifest.jsonl (one JSON line per exported item with relative file names); read the files from disk.")]
+        + "The response lists the export folder and manifest.jsonl (one JSON line per exported item with relative file names); read the files from disk. "
+        + "TIA Portal does not export in online mode: when nothing could be exported for that reason the call fails (go offline and repeat); "
+        + "pathPrefixes that match no item, and other partial failures, are reported in warning.")]
     public static async Task<string> ExportToFolder(
         OpennessWorkerClient workerClient,
         TiaMcpServer.Export.ExportRootOptions exportRootOptions,

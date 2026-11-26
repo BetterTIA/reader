@@ -3,6 +3,9 @@ using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Siemens.Engineering;
+using Siemens.Engineering.HW;
+using Siemens.Engineering.HW.Features;
+using Siemens.Engineering.Online;
 using Siemens.Engineering.SW;
 using Siemens.Engineering.SW.Blocks;
 using Siemens.Engineering.SW.ExternalSources;
@@ -92,10 +95,19 @@ internal static class ProjectFolderExporter
         EnsureUnderRoot(exportRoot, plcDirectory);
         Directory.CreateDirectory(plcDirectory);
 
-        var items = Enumerate(plcSoftware, include)
-            .Where(item => MatchesPathFilter(item.Path, request.ExportPathPrefixes))
+        var all = Enumerate(plcSoftware, include).ToList();
+        var items = all
+            .Where(item => ProjectFolderExportCheck.MatchesPathFilter(item.Path, request.ExportPathPrefixes))
             .OrderBy(item => item.Path, StringComparer.OrdinalIgnoreCase)
             .ToList();
+        var warnings = new List<string>();
+        var prefixWarning = ProjectFolderExportCheck.UnmatchedPrefixesWarning(
+            request.ExportPathPrefixes,
+            all.Select(item => item.Path).ToList());
+        if (prefixWarning is not null)
+        {
+            warnings.Add(prefixWarning);
+        }
 
         if (offset > items.Count)
         {
@@ -123,6 +135,8 @@ internal static class ProjectFolderExporter
         };
 
         var index = offset;
+        var onlineRefused = 0;
+        string? firstError = null;
         var manifest = ManifestStore.Load(manifestPath);
         try
         {
@@ -144,6 +158,12 @@ internal static class ProjectFolderExporter
                 else
                 {
                     result.FailedItems++;
+                    firstError ??= $"{entry.Path}: {entry.Error}";
+                    if (ProjectFolderExportCheck.IsOnlineModeError(entry.Error))
+                    {
+                        onlineRefused++;
+                    }
+
                     if (result.Failures.Count < MaxReportedFailures)
                     {
                         result.Failures.Add(new ProjectFolderExportFailure { Path = entry.Path, Error = entry.Error });
@@ -161,10 +181,39 @@ internal static class ProjectFolderExporter
             manifest.Save(manifestPath);
         }
 
+        // Throws when nothing was exported in online mode, so the caller never works from an old export.
+        var outcomeWarning = ProjectFolderExportCheck.CheckOutcome(
+            result.ProcessedItems,
+            result.SucceededItems,
+            onlineRefused,
+            result.ProcessedItems > result.SucceededItems ? TryIsOnline(plcSoftware) : null,
+            plcSoftware.Name,
+            firstError);
+        if (outcomeWarning is not null)
+        {
+            warnings.Add(outcomeWarning);
+        }
+
+        result.Warning = warnings.Count == 0 ? null : string.Join(" ", warnings);
         result.Complete = index >= items.Count;
         result.NextOffset = result.Complete ? null : index;
         result.ElapsedMs = stopwatch.ElapsedMilliseconds;
         return result;
+    }
+
+    /// <summary>Online state of the CPU that hosts the PLC software; null when it cannot be read.</summary>
+    private static bool? TryIsOnline(PlcSoftware plcSoftware)
+    {
+        try
+        {
+            var cpu = (plcSoftware.Parent as SoftwareContainer)?.Parent as DeviceItem;
+            var state = cpu?.GetService<OnlineProvider>()?.State;
+            return state is null ? null : state == OnlineState.Online;
+        }
+        catch (Exception)
+        {
+            return null;
+        }
     }
 
     private static ProjectFolderManifestEntry ExportItem(
@@ -416,18 +465,6 @@ internal static class ProjectFolderExporter
     private static string BuildPath(string plcName, IEnumerable<string> segments, string name)
         => string.Join("/", new[] { plcName }.Concat(segments).Concat(new[] { name }));
 
-    private static bool MatchesPathFilter(string path, List<string>? prefixes)
-    {
-        if (prefixes is null || prefixes.Count == 0)
-        {
-            return true;
-        }
-
-        return prefixes.Any(prefix =>
-            !string.IsNullOrWhiteSpace(prefix) &&
-            path.StartsWith(prefix.Trim().TrimEnd('/'), StringComparison.OrdinalIgnoreCase));
-    }
-
     private static bool RunStep(List<string> errors, string step, Action action)
     {
         try
@@ -617,6 +654,7 @@ internal sealed class ProjectFolderExportResult
     public int? NextOffset { get; set; }
     public long ElapsedMs { get; set; }
     public List<ProjectFolderExportFailure> Failures { get; set; } = new();
+    public string? Warning { get; set; }
 }
 
 internal sealed class ProjectFolderExportFailure

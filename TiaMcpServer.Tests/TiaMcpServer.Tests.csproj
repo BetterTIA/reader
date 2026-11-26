@@ -33,6 +33,8 @@
       Link="Linked\Openness\ManifestStore.cs" />
     <Compile Include="..\TiaMcpServer.OpennessWorker\Openness\IncludeXmlCheck.cs"
       Link="Linked\Openness\IncludeXmlCheck.cs" />
+    <Compile Include="..\TiaMcpServer.OpennessWorker\Openness\ProjectFolderExportCheck.cs"
+      Link="Linked\Openness\ProjectFolderExportCheck.cs" />
     <Compile Include="..\TiaMcpServer.OpennessWorker\Openness\ObjectCrossReferenceModel.cs"
       Link="Linked\Openness\ObjectCrossReferenceModel.cs" />
     <Compile Update="Batch\TagOperationPrerequisiteBaselineTests.cs" />
