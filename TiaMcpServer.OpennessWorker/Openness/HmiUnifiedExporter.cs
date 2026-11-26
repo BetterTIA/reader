@@ -336,6 +336,20 @@ internal static class HmiUnifiedExporter
             node["items"] = items;
         }
 
+        // Data grid parts (AlarmView of an alarm control, the grids of trend and diagnosis controls) keep their columns
+        // in a "Columns" composition, which GetAttributes does not return. A column is dumped one level up (depth - 2):
+        // its header text (column -> Header -> Text) then nests as deep as the text of a screen item, with its culture.
+        if (depth > 0 && depth < MaxNestingDepth && HasComposition(engineering, "Columns"))
+        {
+            var columns = new JsonArray();
+            foreach (var column in Composition(engineering, "Columns"))
+            {
+                columns.Add(DumpObject(column, ModeAll, depth - 2));
+            }
+
+            node["columns"] = columns;
+        }
+
         return node;
     }
 

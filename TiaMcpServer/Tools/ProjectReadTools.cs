@@ -119,7 +119,7 @@ public class ProjectReadTools
     [McpServerTool(Name = "export_hmi_to_folder", ReadOnly = true, Destructive = false, OpenWorld = false)]
     [Description("Dump a WinCC Unified HMI into JSON files under the server's configured export root: one file per screen "
         + "(screen attributes plus every screen item with its type, geometry Left/Top/Width/Height, colors, texts, fonts, "
-        + "tag dynamizations incl. indirect addressing, and event scripts), one file per HMI tag table, alarms.json and connections.json. "
+        + "tag dynamizations incl. indirect addressing, event scripts, and the columns of data grid parts such as AlarmView.columns of an alarm control: name, width, visible, header text), one file per HMI tag table, alarms.json and connections.json. "
         + "Use it to see HMI page layout and bindings; render a screen preview from the screen JSON. The project is not modified. "
         + "Work is chunked by time: repeat with the returned runId and nextOffset until complete is true; files are listed in manifest-hmi.jsonl.")]
     public static async Task<string> ExportHmiToFolder(
